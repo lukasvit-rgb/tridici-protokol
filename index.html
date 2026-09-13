@@ -333,6 +333,12 @@
   function ZAPISOVATELE_LOOKUP(id){ for (var i=0;i<ZAPISOVATELE.length;i++){ if (ZAPISOVATELE[i].id===id) return ZAPISOVATELE[i]; } return null; }
   function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   function fmtDateCZ(iso){ var p=String(iso||"").split("-"); return p.length===3 ? p[2]+"."+p[1]+"."+p[0] : (iso||"—"); }
+  // Úkoly založené appkou Dashboard mají pocet_palet=null, dokud skladník po vyložení
+  // nepotvrdí skutečný rozpad na středisko Třídírna — do té doby se neukazuje žádný odhad.
+  function pocetPaletText(t){
+    if (t.pocet_palet == null) return "čeká na potvrzení počtu skladníkem";
+    return t.pocet_palet + " pal.";
+  }
   function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
   function uid(){ return "r"+Math.random().toString(36).slice(2,9); }
 
@@ -481,7 +487,7 @@
       var actionLabel = t.stav === "hotovo" ? "Zobrazit" : "Zpracovat";
       return '<div class="task-card">'+
         '<div class="task-main"><span class="zak">'+escapeHtml(t.zakaznik)+'</span>'+
-        '<span class="meta">'+fmtDateCZ(t.datum)+' · '+(t.pocet_palet||0)+' pal. (plán) · třídí '+escapeHtml(names)+' · založil '+zapisovatelName(t.zalozil)+'</span>'+
+        '<span class="meta">'+fmtDateCZ(t.datum)+' · '+pocetPaletText(t)+' · třídí '+escapeHtml(names)+' · založil '+zapisovatelName(t.zalozil)+'</span>'+
         renderFotkyLinks(t.fotky)+
         '</div>'+
         '<div class="task-actions">'+badge+'<button class="btn ghost small" data-open="'+t._id+'">'+actionLabel+'</button></div>'+
@@ -525,7 +531,7 @@
       var names = (task.pracovnik||[]).map(function(id){ var w=byId(WORKERS,id); return w?w.name:id; }).join(", ") || "—";
       document.getElementById("task-info").innerHTML =
         '<div class="task-main"><span class="zak">'+escapeHtml(task.zakaznik)+'</span>'+
-        '<span class="meta">'+fmtDateCZ(task.datum)+' · odhad '+(task.pocet_palet||0)+' palet (plán) · plánovaně třídí '+escapeHtml(names)+'</span>'+
+        '<span class="meta">'+fmtDateCZ(task.datum)+' · '+pocetPaletText(task)+' · plánovaně třídí '+escapeHtml(names)+'</span>'+
         renderFotkyLinks(task.fotky)+'</div>';
       rForm.firma = task.zakaznik; rForm.datum = task.datum;
       if (task.stav === "hotovo" && task.vysledek){
