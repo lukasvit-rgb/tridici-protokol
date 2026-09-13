@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Třídicí protokol</title>
+<meta name="description" content="Úkoly třídění z vykládek a zápis výsledku třídění — appka pro dílnu Palety Vít.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#E9EDEC; --surface:#FFFFFF; --surface-2:#F3F5F4;
+    --border:#D5DAD8; --border-strong:#B9C1BE;
+    --ink:#1B2422; --ink-soft:#556360; --ink-faint:#8B9995;
+    --accent:#BE5322; --accent-ink:#FFF9F5; --accent-soft:#F6E4D8;
+    --ai:#7B4FA0; --ai-soft:#EDE4F2;
+    --good:#3D7A49; --good-soft:#E3EFE2;
+    --damaged:#AC4526; --damaged-soft:#F3E1D9;
+    --pending:#A9781F; --pending-soft:#F1E9D6;
+    --focus:#7B4FA0;
+    --shadow-sm:0 1px 2px rgba(20,28,26,.07); --shadow-md:0 6px 18px rgba(20,28,26,.10);
+    --radius-s:8px; --radius-m:14px; --radius-l:22px;
+    --font-display:'Archivo',system-ui,sans-serif;
+    --font-body:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121715; --surface:#1B2320; --surface-2:#212A27;
+      --border:#313B37; --border-strong:#455049;
+      --ink:#EAF0ED; --ink-soft:#A7B4AF; --ink-faint:#6E7A75;
+      --accent:#E27B45; --accent-ink:#1B140D; --accent-soft:#3A2A1D;
+      --ai:#B48FD0; --ai-soft:#2E2438;
+      --good:#7FBE85; --good-soft:#1F3323;
+      --damaged:#E08462; --damaged-soft:#3B2620;
+      --pending:#E0BB63; --pending-soft:#3A3120;
+      --focus:#B48FD0;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-md:0 10px 24px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121715; --surface:#1B2320; --surface-2:#212A27;
+    --border:#313B37; --border-strong:#455049;
+    --ink:#EAF0ED; --ink-soft:#A7B4AF; --ink-faint:#6E7A75;
+    --accent:#E27B45; --accent-ink:#1B140D; --accent-soft:#3A2A1D;
+    --ai:#B48FD0; --ai-soft:#2E2438;
+    --good:#7FBE85; --good-soft:#1F3323;
+    --damaged:#E08462; --damaged-soft:#3B2620;
+    --pending:#E0BB63; --pending-soft:#3A3120;
+    --focus:#B48FD0;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-md:0 10px 24px rgba(0,0,0,.4);
+  }
+
+  *{box-sizing:border-box;}
+  body{ margin:0;background:var(--bg);color:var(--ink); font-family:var(--font-body); padding:20px 16px 56px; -webkit-font-smoothing:antialiased; }
+  @media (min-width:720px){ body{ padding:32px 32px 64px; } }
+  .wrap{ max-width:1000px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
+
+  .app-header{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; }
+  .brand{ display:flex; flex-direction:column; gap:4px; }
+  .brand .eyebrow{ font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .brand h1{ font-family:var(--font-display); font-weight:800; font-size:clamp(24px,4vw,32px); margin:0; letter-spacing:-.01em; text-wrap:balance; }
+  .brand .sub{ color:var(--ink-soft); font-size:14.5px; }
+
+  .tabs{ display:flex; gap:6px; background:var(--surface-2); padding:5px; border-radius:999px; border:1px solid var(--border); flex-wrap:wrap; }
+  .tab-btn{ font-family:var(--font-body); font-weight:600; font-size:14px; color:var(--ink-soft); background:transparent; border:none; padding:10px 16px; border-radius:999px; cursor:pointer; }
+  .tab-btn[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm); }
+  .tab-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  .version-note{ display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m); padding:12px 14px; font-size:13.5px; color:var(--ink-soft); box-shadow:var(--shadow-sm); }
+  .version-note .dot{ width:8px;height:8px;border-radius:50%;background:var(--accent); margin-top:6px; flex:none; }
+  .version-note b{ color:var(--ink); }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); padding:20px; box-shadow:var(--shadow-sm); }
+  .card h2{ font-family:var(--font-display); font-size:17px; margin:0 0 3px; letter-spacing:-.005em; }
+  .card .hint{ color:var(--ink-soft); font-size:13.5px; margin:0 0 14px; }
+  .section-stack{ display:flex; flex-direction:column; gap:16px; }
+
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:13px; font-weight:600; color:var(--ink-soft); }
+  .field input[type="text"], .field input[type="number"], .field select, .field textarea{
+    font-family:var(--font-body); font-size:15.5px; padding:11px 13px; border-radius:var(--radius-s);
+    border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); width:100%;
+  }
+  .field textarea{ resize:vertical; min-height:52px; }
+  .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .field-row.three{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:640px){ .field-row, .field-row.three{ grid-template-columns:1fr; } }
+
+  .chip-grid{ display:flex; flex-wrap:wrap; gap:9px; }
+  .chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); font-weight:600; font-size:14px; cursor:pointer; }
+  .chip .swatch{ width:10px; height:10px; border-radius:50%; }
+  .chip[aria-pressed="true"]{ background:var(--chip-c-soft,var(--accent-soft)); border-color:var(--chip-c,var(--accent)); }
+  .chip:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  .btn{ font-family:var(--font-body); font-weight:700; font-size:15px; padding:12px 20px; border-radius:999px; border:none; cursor:pointer; }
+  .btn:active{ transform:scale(.98); }
+  .btn.primary{ background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow-sm); }
+  .btn.primary:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn.ghost{ background:transparent; color:var(--ink-soft); border:1.5px solid var(--border-strong); }
+  .btn.small{ padding:8px 14px; font-size:13px; }
+  .btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .form-msg{ font-size:13.5px; font-weight:600; min-height:18px; }
+  .form-msg.err{ color:var(--damaged); }
+  .form-msg.ok{ color:var(--good); }
+
+  /* task list */
+  .task-card{ border:1.5px solid var(--border); border-radius:var(--radius-m); padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; }
+  .task-card + .task-card{ margin-top:10px; }
+  .task-main{ display:flex; flex-direction:column; gap:3px; }
+  .task-main .zak{ font-family:var(--font-display); font-weight:700; font-size:15.5px; }
+  .task-main .meta{ font-size:12.5px; color:var(--ink-soft); font-family:var(--font-mono); }
+  .status-badge{ font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; }
+  .status-badge.novy{ background:var(--pending-soft); color:var(--pending); }
+  .status-badge.hotovo{ background:var(--good-soft); color:var(--good); }
+  .task-actions{ display:flex; gap:8px; align-items:center; }
+
+  .empty-state{ text-align:center; padding:30px 16px; color:var(--ink-soft); }
+  .empty-state .glyph{ width:48px; height:48px; margin:0 auto 12px; border-radius:14px; background:var(--surface-2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; font-size:17px; color:var(--ink-faint); }
+  .empty-state h3{ font-family:var(--font-display); font-size:15.5px; margin:0 0 4px; color:var(--ink); }
+  .empty-state p{ margin:0; font-size:13.5px; max-width:380px; margin-inline:auto; }
+
+  /* zpracovat */
+  .task-picker{ display:flex; flex-wrap:wrap; gap:8px; }
+  .task-pick-chip{ padding:9px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface); font-size:13.5px; font-weight:600; cursor:pointer; }
+  .task-pick-chip[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); }
+
+  table.rows{ width:100%; border-collapse:collapse; font-size:14px; }
+  table.rows th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); padding:0 8px 8px; font-weight:600; border-bottom:1.5px solid var(--border); }
+  table.rows td{ padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  table.rows input[type="number"]{ width:72px; padding:7px 8px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .row-del-btn{ background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12.5px; }
+  .row-del-btn:hover{ color:var(--damaged); }
+  .table-scroll{ overflow-x:auto; }
+
+  .identity-bar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 16px; box-shadow:var(--shadow-sm); }
+  .identity-bar .lbl{ font-size:13px; font-weight:600; color:var(--ink-soft); white-space:nowrap; }
+  .identity-chip{ padding:8px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface-2); font-size:13.5px; font-weight:700; cursor:pointer; }
+  .identity-chip[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+
+  .zam-row{ display:grid; grid-template-columns:1fr 100px auto; gap:10px; align-items:center; margin-bottom:8px; }
+  @media (max-width:520px){ .zam-row{ grid-template-columns:1fr 90px auto; } }
+  .zam-row select{ font-family:var(--font-body); font-size:14.5px; padding:10px 11px; border-radius:var(--radius-s); border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); width:100%; }
+  .zam-row input[type="number"]{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:center; }
+  .zam-del{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:13px; padding:6px; }
+  .zam-del:hover{ color:var(--damaged); }
+
+  .foto-links{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .foto-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft); text-decoration:none; }
+  .foto-chip img{ width:16px; height:16px; border-radius:3px; object-fit:cover; }
+  .foto-chip:hover{ border-color:var(--accent); color:var(--ink); }
+
+  .export-box{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px; }
+  .export-box textarea{ width:100%; min-height:130px; font-family:var(--font-mono); font-size:12.5px; border:1px solid var(--border); border-radius:var(--radius-s); padding:10px; background:var(--surface); color:var(--ink); }
+
+  footer.doc-footer{ font-size:12.5px; color:var(--ink-faint); border-top:1px solid var(--border); padding-top:16px; line-height:1.6; }
+  footer.doc-footer b{ color:var(--ink-soft); }
+  [hidden]{ display:none !important; }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="app-header">
+    <div class="brand">
+      <span class="eyebrow">Palety Vít · dílna</span>
+      <h1>Třídicí protokol</h1>
+      <span class="sub">Úkoly z vykládek + zápis výsledku třídění</span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Zobrazení">
+      <button class="tab-btn" id="tab-btn-ukoly" role="tab" aria-selected="true">Úkoly</button>
+      <button class="tab-btn" id="tab-btn-zpracovat" role="tab" aria-selected="false">Zpracovat</button>
+      <button class="tab-btn" id="tab-btn-prehled" role="tab" aria-selected="false">Přehled</button>
+    </div>
+  </div>
+
+  <div class="identity-bar">
+    <span class="lbl">Kdo právě zapisuje:</span>
+    <div class="chip-grid" id="zapisovatel-chips"></div>
+  </div>
+
+  <div class="version-note">
+    <span class="dot"></span>
+    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). <b>Úkoly teď chodí automaticky z appky Dashboard</b> — jakmile se tam vykládka označí „Očekává se třídění" (nebo se u ní zadá reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"). Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. Appka běží naostro na vlastním Firebase projektu (odděleně od appky Evidence oprav) — data se ukládají opravdu, ne jen jako náhled. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
+  </div>
+
+  <section id="panel-ukoly" role="tabpanel">
+    <div class="section-stack">
+
+      <div class="card">
+        <h2>Nová vykládka</h2>
+        <p class="hint">Tohle je krok appky Dashboard — v ostrém provozu se vyplní tam, sem jen dorazí hotové. Dokud appky nejsou propojené, zapisuje se to tady: jakmile vykládku uložíš s určením „Třídění", rovnou se objeví ve frontě jako úkol, nic dalšího zakládat nemusíš.</p>
+        <div class="section-stack">
+          <div class="field-row three">
+            <div class="field"><label for="nu-datum">Datum</label><input type="text" id="nu-datum"></div>
+            <div class="field"><label for="nu-zakaznik">Zákazník</label><input type="text" id="nu-zakaznik" placeholder="např. Diton"></div>
+            <div class="field"><label for="nu-pocet">Počet palet podle DL</label><input type="number" id="nu-pocet" min="0" step="1" placeholder="např. 33"></div>
+          </div>
+          <div class="field">
+            <label>Určení</label>
+            <div class="chip-grid" id="nu-urceni-chips"></div>
+          </div>
+          <div class="field" id="nu-pracovnik-field">
+            <label>Kdo bude třídit (plán)</label>
+            <div class="chip-grid" id="nu-pracovnik-chips"></div>
+          </div>
+          <div class="field">
+            <label for="nu-fotky">Fotky dodacího listu (odkazy na Google Drive)</label>
+            <textarea id="nu-fotky" placeholder="Vlož jeden nebo víc odkazů, každý na nový řádek nebo oddělené čárkou…"></textarea>
+          </div>
+          <div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <button class="btn primary" id="btn-nu-save">Uložit vykládku</button>
+            <div class="form-msg" id="nu-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Úkoly třídění</h2>
+        <p class="hint">Vykládky z appky Dashboard určené na „Třídění" — objeví se tady automaticky, nic se nezakládá ručně dvakrát. Nové čekají na zpracování, hotové mají uložený výsledek. <span id="nu-jine-count" style="color:var(--ink-faint);"></span></p>
+        <div id="ukoly-list"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="panel-zpracovat" role="tabpanel" hidden>
+    <div class="section-stack">
+
+      <div class="card">
+        <h2>Vyber úkol</h2>
+        <p class="hint">Nebo zpracuj bez úkolu — ad hoc dovoz, který v Dashboardu ještě není.</p>
+        <div class="task-picker" id="task-picker"></div>
+      </div>
+
+      <div class="card" id="task-info-card" hidden>
+        <h2>Detail úkolu</h2>
+        <div id="task-info"></div>
+      </div>
+
+      <div class="card">
+        <h2>Zadej výsledek třídění</h2>
+        <p class="hint">Ruční zápis podle papírového třídicího protokolu — sken fotky (OCR) zatím není zapojený, doplní se později.</p>
+        <div class="field-row">
+          <div class="field"><label for="r-firma">Firma / zákazník</label><input type="text" id="r-firma"></div>
+          <div class="field"><label for="r-datum">Datum</label><input type="text" id="r-datum"></div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Zaměstnanci a odpracovaný čas</label>
+          <p class="hint" style="margin:0 0 8px;">Zapisuje ten, kdo je zvolený nahoře jako „Kdo právě zapisuje" — tady vyplní, kteří zaměstnanci na tom dělali a jak dlouho každý z nich.</p>
+          <div id="zam-rows"></div>
+          <button type="button" class="btn ghost small" id="btn-add-zam">+ Přidat zaměstnance</button>
+        </div>
+        <div style="margin-top:16px;" class="table-scroll">
+          <table class="rows" id="rows-table">
+            <thead><tr><th>Typ palety</th><th>Dobré</th><th>Poškozené</th><th></th></tr></thead>
+            <tbody id="rows-tbody"></tbody>
+          </table>
+        </div>
+        <button class="btn ghost small" id="btn-add-row" style="margin-top:10px;">+ Přidat vlastní typ</button>
+        <div class="field" style="margin-top:14px;">
+          <label for="r-poznamka">Poznámka</label>
+          <textarea id="r-poznamka" placeholder="Volitelné…"></textarea>
+        </div>
+        <div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:14px;">
+          <button class="btn primary" id="btn-save-result">Uložit výsledek</button>
+          <div class="form-msg" id="result-msg"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="panel-prehled" role="tabpanel" hidden>
+    <div class="section-stack">
+      <div class="card">
+        <h2>Hotové protokoly</h2>
+        <p class="hint">Podklad pro objednávku — zatím jako čitelný textový souhrn ke zkopírování, dokud neupřesníme přesný cílový formát.</p>
+        <div id="prehled-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="doc-footer">
+    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně; automatické napojení na appku Dashboard (datum/zákazník/fotky se zatím zadávají a vkládají ručně jako odkaz, ne živě z Disku); přesný cílový formát objednávky (export je zatím obecný textový souhrn); typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí.</div>
+  </footer>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyB-pBW5Yh3syOvsNfQ4mCHTJlj3M3Lu1Fc",
+    authDomain: "tridici-protokol.firebaseapp.com",
+    projectId: "tridici-protokol",
+    storageBucket: "tridici-protokol.firebasestorage.app",
+    messagingSenderId: "1071564459585",
+    appId: "1:1071564459585:web:4f2fe24756a3f1323540c0"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.firestore();
+
+  var WORKERS = [
+    { id:"radek",   name:"Radek",   color:"#2C6B6E" },
+    { id:"pavel",   name:"Pavel",   color:"#E67E22" },
+    { id:"martin",  name:"Martin",  color:"#5B6BA8" },
+    { id:"zavadil", name:"Zavadil", color:"#A8574A" }
+  ];
+
+  // Types straight off the real paper protocol (not the theoretical master seznam — see footer note).
+  var FIXED_TYPES = ["EUR A","EUR B","120×80 AGRIS","120×80 TUNA","120×80 LAŤ.","100×120","100×120 rám.","80×60"];
+
+  // Who is allowed to operate this appka — not the same people as the workers being logged.
+  var ZAPISOVATELE = [
+    { id:"ondrej",   name:"Ondřej",  color:"#3D5A99" },
+    { id:"lukas",    name:"Lukáš",   color:"#8C4F9E" },
+    { id:"martin_b", name:"Martin B.", color:"#4A7C59" },
+    // Ne skutečný člověk — jen štítek "založil" pro úkoly, které appka Dashboard založila
+    // automaticky (vykládka s určením "Třídění"). Proto se nezobrazuje v přepínači níž.
+    { id:"dashboard", name:"Dashboard", color:"#8A8A8A" }
+  ];
+  var currentZapisovatel = ZAPISOVATELE[0].id;
+
+  function byId(list,id){ for (var i=0;i<list.length;i++){ if (list[i].id===id) return list[i]; } return null; }
+  function zapisovatelName(id){ var z = ZAPISOVATELE_LOOKUP(id); return z ? z.name : "—"; }
+  function ZAPISOVATELE_LOOKUP(id){ for (var i=0;i<ZAPISOVATELE.length;i++){ if (ZAPISOVATELE[i].id===id) return ZAPISOVATELE[i]; } return null; }
+  function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function fmtDateCZ(iso){ var p=String(iso||"").split("-"); return p.length===3 ? p[2]+"."+p[1]+"."+p[0] : (iso||"—"); }
+  function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
+  function uid(){ return "r"+Math.random().toString(36).slice(2,9); }
+
+  var tasks = [];
+  var selectedTaskId = null;
+
+  var resultRows = []; // {id, typ, dobre, poskozene}
+  function emptyRows(){ return FIXED_TYPES.map(function(t){ return { id: uid(), typ:t, dobre:0, poskozene:0 }; }); }
+
+  var URCENI = [
+    { id:"trideni", name:"Třídění" },
+    { id:"oprava",  name:"Oprava" },
+    { id:"sklad",   name:"Rovnou sklad (OK)" }
+  ];
+  var nuForm = { datum: todayISO(), pracovnik: [], urceni: "trideni" };
+  var rForm = { firma:"", datum: todayISO(), zamestnanci: [] }; // zamestnanci: [{id, pracovnik, hodiny}]
+
+  function defaultZamRow(pracovnikId){ return { id: uid(), pracovnik: pracovnikId || "", hodiny: 0 }; }
+
+  // ---------------- init ----------------
+  function initFirestore(){
+    db.collection("ukoly").orderBy("vytvoreno","desc").limit(300).onSnapshot(function(snap){
+      tasks = snap.docs.map(function(d){ var v=d.data(); v._id=d.id; return v; });
+      renderUkolyList(); renderTaskPicker(); renderPrehled();
+    }, function(err){
+      console.error("db snapshot error", err);
+      var msg = document.getElementById("nu-msg");
+      msg.textContent = "Nepovedlo se připojit k databázi (" + (err && err.code ? err.code : "chyba") + ").";
+      msg.className = "form-msg err";
+    });
+  }
+
+  // ---------------- identity bar ----------------
+  function renderZapisovatelChips(){
+    var wrap = document.getElementById("zapisovatel-chips");
+    wrap.innerHTML = "";
+    ZAPISOVATELE.filter(function(z){ return z.id !== "dashboard"; }).forEach(function(z){
+      var chip = document.createElement("button");
+      chip.type = "button"; chip.className = "identity-chip";
+      chip.setAttribute("aria-pressed", currentZapisovatel === z.id ? "true" : "false");
+      chip.textContent = z.name;
+      chip.addEventListener("click", function(){ currentZapisovatel = z.id; renderZapisovatelChips(); });
+      wrap.appendChild(chip);
+    });
+  }
+
+  // ---------------- ukoly tab ----------------
+  function renderUrceniChips(){
+    var wrap = document.getElementById("nu-urceni-chips");
+    wrap.innerHTML = "";
+    URCENI.forEach(function(u){
+      var chip = document.createElement("button");
+      chip.type = "button"; chip.className = "chip";
+      chip.setAttribute("aria-pressed", nuForm.urceni === u.id ? "true":"false");
+      chip.textContent = u.name;
+      chip.addEventListener("click", function(){
+        nuForm.urceni = u.id;
+        renderUrceniChips();
+        document.getElementById("nu-pracovnik-field").hidden = (nuForm.urceni !== "trideni");
+      });
+      wrap.appendChild(chip);
+    });
+    document.getElementById("nu-pracovnik-field").hidden = (nuForm.urceni !== "trideni");
+  }
+
+  function renderPracovnikChips(containerId, formObj, single){
+    var wrap = document.getElementById(containerId);
+    wrap.innerHTML = "";
+    WORKERS.forEach(function(w){
+      var chip = document.createElement("button");
+      chip.type = "button"; chip.className = "chip";
+      chip.style.setProperty("--chip-c", w.color);
+      chip.style.setProperty("--chip-c-soft", w.color + "22");
+      var pressed = formObj.pracovnik.indexOf(w.id) !== -1;
+      chip.setAttribute("aria-pressed", pressed ? "true":"false");
+      chip.innerHTML = '<span class="swatch" style="background:'+w.color+'"></span>'+w.name;
+      chip.addEventListener("click", function(){
+        if (single){ formObj.pracovnik = pressed ? [] : [w.id]; }
+        else {
+          var i = formObj.pracovnik.indexOf(w.id);
+          if (i!==-1) formObj.pracovnik.splice(i,1); else formObj.pracovnik.push(w.id);
+        }
+        renderPracovnikChips(containerId, formObj, single);
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  function saveNewTask(){
+    var zakaznik = document.getElementById("nu-zakaznik").value.trim();
+    var pocet = Number(document.getElementById("nu-pocet").value || 0);
+    var msg = document.getElementById("nu-msg");
+    if (!zakaznik){ msg.textContent = "Vyplň zákazníka."; msg.className="form-msg err"; return; }
+    if (nuForm.urceni === "trideni" && nuForm.pracovnik.length === 0){ msg.textContent = "Vyber, kdo bude třídit."; msg.className="form-msg err"; return; }
+    var fotky = parseFotky(document.getElementById("nu-fotky").value);
+    db.collection("ukoly").add({
+      datum: nuForm.datum, zakaznik: zakaznik, pocet_palet: pocet, urceni: nuForm.urceni,
+      pracovnik: nuForm.pracovnik.slice(), fotky: fotky, stav: "novy",
+      zalozil: currentZapisovatel,
+      vytvoreno: new Date().toISOString()
+    }).then(function(){
+      msg.textContent = nuForm.urceni === "trideni" ? "Vykládka uložena ✓ — objevila se ve frontě úkolů níž." : "Vykládka uložena ✓ (mimo třídění, appka Třídicí protokol ji dál neřeší).";
+      msg.className="form-msg ok";
+      document.getElementById("nu-zakaznik").value = "";
+      document.getElementById("nu-pocet").value = "";
+      document.getElementById("nu-fotky").value = "";
+      nuForm.datum = todayISO(); nuForm.pracovnik = []; nuForm.urceni = "trideni";
+      document.getElementById("nu-datum").value = fmtDateCZ(nuForm.datum);
+      renderPracovnikChips("nu-pracovnik-chips", nuForm, false);
+      renderUrceniChips();
+    }).catch(function(e){ console.error(e); msg.textContent = "Nepovedlo se uložit."; msg.className="form-msg err"; });
+  }
+
+  function parseFotky(raw){
+    return String(raw||"").split(/[\n,]/).map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+
+  function driveThumb(url){
+    var m = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return m ? ("https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w100") : null;
+  }
+
+  function renderFotkyLinks(fotky){
+    if (!fotky || !fotky.length) return "";
+    return '<div class="foto-links">' + fotky.map(function(url){
+      var thumb = driveThumb(url);
+      var img = thumb ? '<img src="'+thumb+'" onerror="this.remove()">' : "";
+      return '<a class="foto-chip" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+img+'📷 Foto</a>';
+    }).join("") + '</div>';
+  }
+
+  function trideniTasks(){ return tasks.filter(function(t){ return (t.urceni||"trideni") === "trideni"; }); }
+
+  function renderUkolyList(){
+    var wrap = document.getElementById("ukoly-list");
+    var list = trideniTasks();
+    var jine = tasks.length - list.length;
+    document.getElementById("nu-jine-count").textContent = jine > 0 ? ("(mimo třídění: " + jine + ")") : "";
+    if (list.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné úkoly třídění</h3><p>Ulož výš vykládku s určením „Třídění" — objeví se tady automaticky, v ostrém provozu by ji appka Dashboard vytvořila sama.</p></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function(t){
+      var names = (t.pracovnik||[]).map(function(id){ var w=byId(WORKERS,id); return w?w.name:id; }).join(", ") || "—";
+      var badge = t.stav === "hotovo" ? '<span class="status-badge hotovo">Hotovo</span>' : '<span class="status-badge novy">Nový</span>';
+      var actionLabel = t.stav === "hotovo" ? "Zobrazit" : "Zpracovat";
+      return '<div class="task-card">'+
+        '<div class="task-main"><span class="zak">'+escapeHtml(t.zakaznik)+'</span>'+
+        '<span class="meta">'+fmtDateCZ(t.datum)+' · '+(t.pocet_palet||0)+' pal. (plán) · třídí '+escapeHtml(names)+' · založil '+zapisovatelName(t.zalozil)+'</span>'+
+        renderFotkyLinks(t.fotky)+
+        '</div>'+
+        '<div class="task-actions">'+badge+'<button class="btn ghost small" data-open="'+t._id+'">'+actionLabel+'</button></div>'+
+        '</div>';
+    }).join("");
+    wrap.querySelectorAll("[data-open]").forEach(function(btn){
+      btn.addEventListener("click", function(){ openTaskInZpracovat(btn.getAttribute("data-open")); });
+    });
+  }
+
+  function openTaskInZpracovat(taskId){
+    selectedTaskId = taskId;
+    switchTab("zpracovat");
+    renderTaskPicker();
+    loadSelectedTaskIntoForm();
+  }
+
+  // ---------------- zpracovat tab ----------------
+  function renderTaskPicker(){
+    var wrap = document.getElementById("task-picker");
+    var open = trideniTasks().filter(function(t){ return t.stav !== "hotovo"; });
+    var chips = open.map(function(t){
+      return '<button type="button" class="task-pick-chip" data-id="'+t._id+'" aria-pressed="'+(t._id===selectedTaskId?"true":"false")+'">'+
+        escapeHtml(t.zakaznik)+' · '+fmtDateCZ(t.datum)+'</button>';
+    }).join("");
+    wrap.innerHTML = chips + '<button type="button" class="task-pick-chip" data-id="" aria-pressed="'+(selectedTaskId===null?"true":"false")+'">Bez úkolu (ad hoc)</button>';
+    wrap.querySelectorAll("[data-id]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        selectedTaskId = btn.getAttribute("data-id") || null;
+        renderTaskPicker();
+        loadSelectedTaskIntoForm();
+      });
+    });
+  }
+
+  function loadSelectedTaskIntoForm(){
+    var infoCard = document.getElementById("task-info-card");
+    var task = selectedTaskId ? tasks.find(function(t){ return t._id === selectedTaskId; }) : null;
+    if (task){
+      infoCard.hidden = false;
+      var names = (task.pracovnik||[]).map(function(id){ var w=byId(WORKERS,id); return w?w.name:id; }).join(", ") || "—";
+      document.getElementById("task-info").innerHTML =
+        '<div class="task-main"><span class="zak">'+escapeHtml(task.zakaznik)+'</span>'+
+        '<span class="meta">'+fmtDateCZ(task.datum)+' · odhad '+(task.pocet_palet||0)+' palet (plán) · plánovaně třídí '+escapeHtml(names)+'</span>'+
+        renderFotkyLinks(task.fotky)+'</div>';
+      rForm.firma = task.zakaznik; rForm.datum = task.datum;
+      if (task.stav === "hotovo" && task.vysledek){
+        resultRows = (task.vysledek.radky||[]).map(function(r){ return { id:uid(), typ:r.typ, dobre:r.dobre||0, poskozene:r.poskozene||0 }; });
+        rForm.zamestnanci = (task.vysledek.zamestnanci||[]).map(function(z){ return { id:uid(), pracovnik:z.pracovnik, hodiny:z.hodiny||0 }; });
+        if (rForm.zamestnanci.length === 0) rForm.zamestnanci = [defaultZamRow()];
+        document.getElementById("r-poznamka").value = task.vysledek.poznamka || "";
+      } else {
+        resultRows = emptyRows();
+        rForm.zamestnanci = (task.pracovnik && task.pracovnik.length) ? task.pracovnik.map(function(id){ return defaultZamRow(id); }) : [defaultZamRow()];
+        document.getElementById("r-poznamka").value = "";
+      }
+    } else {
+      infoCard.hidden = true;
+      rForm.firma = ""; rForm.datum = todayISO(); rForm.zamestnanci = [defaultZamRow()];
+      resultRows = emptyRows();
+      document.getElementById("r-poznamka").value = "";
+    }
+    document.getElementById("r-firma").value = rForm.firma;
+    document.getElementById("r-datum").value = fmtDateCZ(rForm.datum);
+    renderZamRows();
+    renderRowsTable();
+  }
+
+  function renderRowsTable(){
+    var tbody = document.getElementById("rows-tbody");
+    tbody.innerHTML = "";
+    resultRows.forEach(function(row){
+      var tr = document.createElement("tr");
+      var isFixed = FIXED_TYPES.indexOf(row.typ) !== -1;
+      var typCell = isFixed ? escapeHtml(row.typ)
+        : '<input type="text" value="'+escapeHtml(row.typ)+'" data-field="typ" style="width:130px;">';
+      tr.innerHTML =
+        '<td>'+typCell+'</td>'+
+        '<td><input type="number" min="0" step="1" value="'+row.dobre+'" data-field="dobre"></td>'+
+        '<td><input type="number" min="0" step="1" value="'+row.poskozene+'" data-field="poskozene"></td>'+
+        '<td>'+(isFixed ? '' : '<button type="button" class="row-del-btn">Smazat</button>')+'</td>';
+      tr.querySelectorAll("input[data-field]").forEach(function(inp){
+        inp.addEventListener("input", function(){
+          var field = inp.getAttribute("data-field");
+          row[field] = field === "typ" ? inp.value : (Number(inp.value)||0);
+        });
+      });
+      var delBtn = tr.querySelector(".row-del-btn");
+      if (delBtn) delBtn.addEventListener("click", function(){
+        resultRows = resultRows.filter(function(r){ return r.id !== row.id; });
+        renderRowsTable();
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("btn-add-row").addEventListener("click", function(){
+    resultRows.push({ id:uid(), typ:"", dobre:0, poskozene:0 });
+    renderRowsTable();
+  });
+
+  function renderZamRows(){
+    var wrap = document.getElementById("zam-rows");
+    wrap.innerHTML = "";
+    rForm.zamestnanci.forEach(function(row){
+      var div = document.createElement("div");
+      div.className = "zam-row";
+      var opts = '<option value="">Vyber zaměstnance…</option>' + WORKERS.map(function(w){
+        return '<option value="'+w.id+'"'+(row.pracovnik===w.id?" selected":"")+'>'+w.name+'</option>';
+      }).join("");
+      div.innerHTML =
+        '<select data-field="pracovnik">'+opts+'</select>'+
+        '<input type="number" min="0" step="0.5" value="'+row.hodiny+'" data-field="hodiny" placeholder="hod.">'+
+        (rForm.zamestnanci.length > 1 ? '<button type="button" class="zam-del">✕</button>' : '<span></span>');
+      div.querySelector('[data-field="pracovnik"]').addEventListener("change", function(e){ row.pracovnik = e.target.value; });
+      div.querySelector('[data-field="hodiny"]').addEventListener("input", function(e){ row.hodiny = Number(e.target.value)||0; });
+      var del = div.querySelector(".zam-del");
+      if (del) del.addEventListener("click", function(){
+        rForm.zamestnanci = rForm.zamestnanci.filter(function(r){ return r.id !== row.id; });
+        renderZamRows();
+      });
+      wrap.appendChild(div);
+    });
+  }
+  document.getElementById("btn-add-zam").addEventListener("click", function(){
+    rForm.zamestnanci.push(defaultZamRow());
+    renderZamRows();
+  });
+
+  function saveResult(){
+    var msg = document.getElementById("result-msg");
+    var firma = document.getElementById("r-firma").value.trim();
+    if (!firma){ msg.textContent = "Vyplň firmu/zákazníka."; msg.className="form-msg err"; return; }
+    var radky = resultRows.filter(function(r){ return r.typ && (r.dobre>0 || r.poskozene>0); })
+      .map(function(r){ return { typ:r.typ, dobre:r.dobre, poskozene:r.poskozene }; });
+    var zamestnanci = rForm.zamestnanci.filter(function(z){ return z.pracovnik; })
+      .map(function(z){ return { pracovnik:z.pracovnik, hodiny:z.hodiny||0 }; });
+    if (zamestnanci.length === 0){ msg.textContent = "Vyber aspoň jednoho zaměstnance."; msg.className="form-msg err"; return; }
+    var vysledek = {
+      firma: firma, datum: document.getElementById("r-datum").value,
+      zamestnanci: zamestnanci, radky: radky,
+      poznamka: document.getElementById("r-poznamka").value.trim(),
+      zapsal: currentZapisovatel,
+      ulozeno: new Date().toISOString()
+    };
+    var planovanoIds = zamestnanci.map(function(z){ return z.pracovnik; });
+    var op = selectedTaskId
+      ? db.collection("ukoly").doc(selectedTaskId).update({ stav:"hotovo", vysledek: vysledek })
+      : db.collection("ukoly").add({
+          datum: vysledek.datum, zakaznik: firma, pocet_palet: radky.reduce(function(s,r){return s+r.dobre+r.poskozene;},0),
+          pracovnik: planovanoIds, zalozil: currentZapisovatel, stav:"hotovo", vysledek: vysledek, vytvoreno: new Date().toISOString()
+        });
+    op.then(function(){
+      msg.textContent = "Uloženo ✓"; msg.className = "form-msg ok";
+    }).catch(function(e){ console.error(e); msg.textContent = "Uložení se nepovedlo."; msg.className="form-msg err"; });
+  }
+
+  // ---------------- prehled tab ----------------
+  function renderPrehled(){
+    var wrap = document.getElementById("prehled-list");
+    var done = trideniTasks().filter(function(t){ return t.stav === "hotovo" && t.vysledek; });
+    if (done.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s textovým souhrnem k zkopírování.</p></div>';
+      return;
+    }
+    wrap.innerHTML = done.map(function(t){
+      var v = t.vysledek;
+      var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
+      var names = zamList.join(", ") || "—";
+      var lines = ["TŘÍDICÍ PROTOKOL", "Firma: "+v.firma, "Datum: "+fmtDateCZ(v.datum), "Zaměstnanci: "+names, "Zapsal: "+zapisovatelName(v.zapsal), ""];
+      (v.radky||[]).forEach(function(r){ lines.push(r.typ+": dobré "+r.dobre+", poškozené "+r.poskozene); });
+      if (v.poznamka) { lines.push(""); lines.push("Poznámka: "+v.poznamka); }
+      var text = lines.join("\n");
+      var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
+      return '<div class="task-card" style="flex-direction:column;align-items:stretch;">'+
+        '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span><span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
+        renderFotkyLinks(t.fotky)+'</div>'+
+        '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+        '<div class="export-box" style="margin-top:10px;"><textarea readonly>'+escapeHtml(text)+'</textarea></div>'+
+        '</div>';
+    }).join("");
+  }
+
+  // ---------------- tabs ----------------
+  function switchTab(name){
+    ["ukoly","zpracovat","prehled"].forEach(function(n){
+      document.getElementById("panel-"+n).hidden = (n !== name);
+      document.getElementById("tab-btn-"+n).setAttribute("aria-selected", n===name ? "true":"false");
+    });
+    if (name === "prehled") renderPrehled();
+    if (name === "zpracovat") renderTaskPicker();
+  }
+  document.getElementById("tab-btn-ukoly").addEventListener("click", function(){ switchTab("ukoly"); });
+  document.getElementById("tab-btn-zpracovat").addEventListener("click", function(){ switchTab("zpracovat"); });
+  document.getElementById("tab-btn-prehled").addEventListener("click", function(){ switchTab("prehled"); });
+
+  document.getElementById("nu-datum").value = fmtDateCZ(nuForm.datum);
+  renderPracovnikChips("nu-pracovnik-chips", nuForm, false);
+  document.getElementById("btn-nu-save").addEventListener("click", saveNewTask);
+  document.getElementById("btn-save-result").addEventListener("click", saveResult);
+
+  renderZapisovatelChips();
+  renderUrceniChips();
+  loadSelectedTaskIntoForm();
+  renderUkolyList();
+  renderTaskPicker();
+  initFirestore();
+})();
+</script>
+</body>
+</html>
