@@ -413,8 +413,13 @@
     return n.typ === "vykladka" && (n.ocekavano === "trideni" || (n.material||[]).some(function(m){ return (m.tridirna||0) > 0; }));
   }
   function nakladkaPocetPalet(n){
-    var sum = (n.material||[]).reduce(function(s,m){ return s + (Number(m.dlQty)||0); }, 0);
-    return sum > 0 ? sum : null;
+    // Nikdy odhad podle DL — jen skutečný počet, který skladník potvrdí v Dashboardu
+    // (středisko Třídírna, pole "tridirna"). Dokud ho nikdo nezadá, radši nezobrazovat
+    // žádné číslo (viz pocetPaletText) než ukazovat plánovanou/DL hodnotu jako by šlo o fakt.
+    var mats = n.material || [];
+    var hasConfirmed = mats.some(function(m){ return m.tridirna != null; });
+    if (!hasConfirmed) return null;
+    return mats.reduce(function(s,m){ return s + (m.tridirna != null ? (Number(m.tridirna)||0) : 0); }, 0);
   }
   function nakladkaFotky(n){
     var urls = [];
