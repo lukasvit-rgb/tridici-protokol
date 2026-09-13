@@ -184,7 +184,7 @@
 
   <div class="version-note">
     <span class="dot"></span>
-    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). Sekce „Nová vykládka" hraje roli appky Dashboard — ulož vykládku s určením „Třídění" a hned se objeví ve frontě úkolů níž. Appka teď běží naostro na vlastním Firebase projektu (odděleně od appky Evidence oprav) — data se ukládají opravdu, ne jen jako náhled. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
+    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). <b>Úkoly teď chodí automaticky z appky Dashboard</b> — jakmile se tam vykládka označí „Očekává se třídění" (nebo se u ní zadá reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"). Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. Appka běží naostro na vlastním Firebase projektu (odděleně od appky Evidence oprav) — data se ukládají opravdu, ne jen jako náhled. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
   </div>
 
   <section id="panel-ukoly" role="tabpanel">
@@ -321,7 +321,10 @@
   var ZAPISOVATELE = [
     { id:"ondrej",   name:"Ondřej",  color:"#3D5A99" },
     { id:"lukas",    name:"Lukáš",   color:"#8C4F9E" },
-    { id:"martin_b", name:"Martin B.", color:"#4A7C59" }
+    { id:"martin_b", name:"Martin B.", color:"#4A7C59" },
+    // Ne skutečný člověk — jen štítek "založil" pro úkoly, které appka Dashboard založila
+    // automaticky (vykládka s určením "Třídění"). Proto se nezobrazuje v přepínači níž.
+    { id:"dashboard", name:"Dashboard", color:"#8A8A8A" }
   ];
   var currentZapisovatel = ZAPISOVATELE[0].id;
 
@@ -366,7 +369,7 @@
   function renderZapisovatelChips(){
     var wrap = document.getElementById("zapisovatel-chips");
     wrap.innerHTML = "";
-    ZAPISOVATELE.forEach(function(z){
+    ZAPISOVATELE.filter(function(z){ return z.id !== "dashboard"; }).forEach(function(z){
       var chip = document.createElement("button");
       chip.type = "button"; chip.className = "identity-chip";
       chip.setAttribute("aria-pressed", currentZapisovatel === z.id ? "true" : "false");
