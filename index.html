@@ -184,7 +184,7 @@
 
   <div class="version-note">
     <span class="dot"></span>
-    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). <b>Úkoly teď chodí automaticky z appky Dashboard</b> — jakmile se tam vykládka označí „Očekává se třídění" (nebo se u ní zadá reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"). Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. Appka běží naostro na vlastním Firebase projektu (odděleně od appky Evidence oprav) — data se ukládají opravdu, ne jen jako náhled. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
+    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). <b>Appka teď opravdu čte data appky Dashboard živě</b> (stejný Firebase projekt) — jakmile se tam vykládka označí „Očekává se třídění" (nebo má reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"), a jakmile se tady uloží výsledek třídění, vykládka v Dashboardu zmizí z fronty čekajících. Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
   </div>
 
   <section id="panel-ukoly" role="tabpanel">
@@ -192,7 +192,7 @@
 
       <div class="card">
         <h2>Nová vykládka</h2>
-        <p class="hint">Tohle je krok appky Dashboard — v ostrém provozu se vyplní tam, sem jen dorazí hotové. Dokud appky nejsou propojené, zapisuje se to tady: jakmile vykládku uložíš s určením „Třídění", rovnou se objeví ve frontě jako úkol, nic dalšího zakládat nemusíš.</p>
+        <p class="hint">Běžný tok je appka Dashboard — vykládky odtamtud se ve frontě níž objeví samy. Tohle je jen záložní ruční zadání pro dovoz, který v Dashboardu nikdo nezaložil.</p>
         <div class="section-stack">
           <div class="field-row three">
             <div class="field"><label for="nu-datum">Datum</label><input type="text" id="nu-datum"></div>
@@ -220,7 +220,7 @@
 
       <div class="card">
         <h2>Úkoly třídění</h2>
-        <p class="hint">Vykládky z appky Dashboard určené na „Třídění" — objeví se tady automaticky, nic se nezakládá ručně dvakrát. Nové čekají na zpracování, hotové mají uložený výsledek. <span id="nu-jine-count" style="color:var(--ink-faint);"></span></p>
+        <p class="hint">Živě z appky Dashboard (vykládky určené na „Třídění") + ruční záznamy z „Nová vykládka" výš. Nové čekají na zpracování, hotové mají uložený výsledek. <span id="nu-jine-count" style="color:var(--ink-faint);"></span></p>
         <div id="ukoly-list"></div>
       </div>
 
@@ -285,7 +285,7 @@
   </section>
 
   <footer class="doc-footer">
-    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně; automatické napojení na appku Dashboard (datum/zákazník/fotky se zatím zadávají a vkládají ručně jako odkaz, ne živě z Disku); přesný cílový formát objednávky (export je zatím obecný textový souhrn); typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí.</div>
+    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; přesný cílový formát objednávky (export je zatím obecný textový souhrn); typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
   </footer>
 
 </div>
@@ -296,13 +296,16 @@
 (function(){
   "use strict";
 
+  // Stejný Firebase projekt jako appka Dashboard (dashboard-palety-vit) — zámerně,
+  // aby appka mohla číst živá data vykládek (kolekce "nakladky") místo vlastní
+  // oddělené kopie. Viz claude/tridici_protokol_migrace_navrh.md.
   var firebaseConfig = {
-    apiKey: "AIzaSyB-pBW5Yh3syOvsNfQ4mCHTJlj3M3Lu1Fc",
-    authDomain: "tridici-protokol.firebaseapp.com",
-    projectId: "tridici-protokol",
-    storageBucket: "tridici-protokol.firebasestorage.app",
-    messagingSenderId: "1071564459585",
-    appId: "1:1071564459585:web:4f2fe24756a3f1323540c0"
+    apiKey: "AIzaSyA2E1Cz9u1f6iNX6uxEv_ubrfaoHGscvF8",
+    authDomain: "dashboard-palety-vit.firebaseapp.com",
+    projectId: "dashboard-palety-vit",
+    storageBucket: "dashboard-palety-vit.firebasestorage.app",
+    messagingSenderId: "383121646386",
+    appId: "1:383121646386:web:0d935d4a0106d2cd376d2b"
   };
   firebase.initializeApp(firebaseConfig);
   var db = firebase.firestore();
@@ -342,8 +345,14 @@
   function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
   function uid(){ return "r"+Math.random().toString(36).slice(2,9); }
 
-  var tasks = [];
-  var selectedTaskId = null;
+  // Živá data appky Dashboard (jen ke čtení) — zdroj fronty úkolů.
+  var nakladky = [];            // kolekce "nakladky" (stejná appka i data jako Dashboard)
+  var workplanByVykladka = {};  // vykladkaId -> [jméno pracovníka,...], z kolekce "workplan"
+  // Vlastní data téhle appky — výsledky třídění + ruční záznamy mimo Dashboard.
+  var tpDocs = [];              // kolekce "tridici_protokoly"
+
+  var tasks = []; // sestaveno v rebuildTasks() z nakladky+workplanByVykladka+tpDocs
+  var selectedTaskId = null; // "nk:<id nakladky>" (z Dashboardu) nebo "tp:<id>" (ruční záznam)
 
   var resultRows = []; // {id, typ, dobre, poskozene}
   function emptyRows(){ return FIXED_TYPES.map(function(t){ return { id: uid(), typ:t, dobre:0, poskozene:0 }; }); }
@@ -358,17 +367,101 @@
 
   function defaultZamRow(pracovnikId){ return { id: uid(), pracovnik: pracovnikId || "", hodiny: 0 }; }
 
-  // ---------------- init ----------------
+  // ---------------- init: napojení na Dashboard + vlastní data ----------------
+  var loadedFlags = { nakladky:false, workplan:false, tp:false };
+
+  function onDbError(err){
+    console.error("db snapshot error", err);
+    var msg = document.getElementById("nu-msg");
+    msg.textContent = "Nepovedlo se připojit k databázi (" + (err && err.code ? err.code : "chyba") + ").";
+    msg.className = "form-msg err";
+  }
+
   function initFirestore(){
-    db.collection("ukoly").orderBy("vytvoreno","desc").limit(300).onSnapshot(function(snap){
-      tasks = snap.docs.map(function(d){ var v=d.data(); v._id=d.id; return v; });
-      renderUkolyList(); renderTaskPicker(); renderPrehled();
-    }, function(err){
-      console.error("db snapshot error", err);
-      var msg = document.getElementById("nu-msg");
-      msg.textContent = "Nepovedlo se připojit k databázi (" + (err && err.code ? err.code : "chyba") + ").";
-      msg.className = "form-msg err";
+    // Kolekce appky Dashboard — jen čteme, nikdy do nich nezapisujeme (kromě
+    // stav:"vyrizene" na nakladky po uložení výsledku, viz saveResult).
+    db.collection("nakladky").onSnapshot(function(snap){
+      nakladky = snap.docs.map(function(d){ var v=d.data(); if(!v.id) v.id=d.id; return v; });
+      loadedFlags.nakladky = true;
+      rebuildTasks();
+    }, onDbError);
+
+    db.collection("workplan").onSnapshot(function(snap){
+      var wp = {};
+      snap.docs.forEach(function(d){
+        var v = d.data();
+        if (v.typ === "trideni" && v.vykladkaId){
+          if (!wp[v.vykladkaId]) wp[v.vykladkaId] = [];
+          wp[v.vykladkaId].push(v.worker);
+        }
+      });
+      workplanByVykladka = wp;
+      loadedFlags.workplan = true;
+      rebuildTasks();
+    }, onDbError);
+
+    // Vlastní kolekce téhle appky — výsledky třídění (i pro úkoly z Dashboardu)
+    // a ruční záznamy ze sekce "Nová vykládka" (ty mají nakladkaId: null).
+    db.collection("tridici_protokoly").orderBy("vytvoreno","desc").limit(300).onSnapshot(function(snap){
+      tpDocs = snap.docs.map(function(d){ var v=d.data(); v._id=d.id; return v; });
+      loadedFlags.tp = true;
+      rebuildTasks();
+    }, onDbError);
+  }
+
+  function matchesTrideni(n){
+    return n.typ === "vykladka" && (n.ocekavano === "trideni" || (n.material||[]).some(function(m){ return (m.tridirna||0) > 0; }));
+  }
+  function nakladkaPocetPalet(n){
+    var sum = (n.material||[]).reduce(function(s,m){ return s + (Number(m.dlQty)||0); }, 0);
+    return sum > 0 ? sum : null;
+  }
+  function nakladkaFotky(n){
+    var urls = [];
+    if (n.dlFoto && n.dlFoto.url) urls.push(n.dlFoto.url);
+    (n.fotoTridirna||[]).forEach(function(p){ if (p && p.url) urls.push(p.url); });
+    return urls;
+  }
+  function workerIdByName(name){
+    var lower = String(name||"").toLowerCase();
+    var found = WORKERS.filter(function(w){ return w.id === lower || w.name.toLowerCase() === lower; });
+    return found.length ? found[0].id : null;
+  }
+
+  // Spojí živé vykládky z Dashboardu (kolekce "nakladky") s vlastními výsledky
+  // (kolekce "tridici_protokoly") a s ručně založenými záznamy mimo Dashboard.
+  function rebuildTasks(){
+    if (!(loadedFlags.nakladky && loadedFlags.workplan && loadedFlags.tp)) return;
+
+    var tpByNakladka = {};
+    tpDocs.forEach(function(t){ if (t.nakladkaId) tpByNakladka[t.nakladkaId] = t; });
+
+    var fromNakladky = nakladky.filter(function(n){
+      if (!matchesTrideni(n)) return false;
+      // Nová/čekající vykládka vždy patří do fronty; už vyřízenou (appka Dashboard
+      // sama nebo dřívější zpracování tady) ukazujeme dál, jen jako "Hotovo".
+      return n.stav === "nove" || !!tpByNakladka[n.id];
+    }).map(function(n){
+      var tp = tpByNakladka[n.id];
+      var pracIds = (workplanByVykladka[n.id]||[]).map(workerIdByName).filter(Boolean);
+      return {
+        _id: "nk:" + n.id, _source: "nakladka", _nakladkaId: n.id, _tpId: tp ? tp._id : null,
+        datum: n.datum, zakaznik: n.partner, pocet_palet: nakladkaPocetPalet(n),
+        pracovnik: pracIds, fotky: nakladkaFotky(n),
+        stav: (tp && tp.stav === "hotovo") ? "hotovo" : "novy",
+        zalozil: "dashboard", urceni: "trideni",
+        vysledek: tp ? tp.vysledek : null
+      };
     });
+
+    var adhoc = tpDocs.filter(function(t){ return !t.nakladkaId; }).map(function(t){
+      var copy = {}; Object.keys(t).forEach(function(k){ copy[k] = t[k]; });
+      copy._id = "tp:" + t._id; copy._source = "adhoc"; copy._nakladkaId = null; copy._tpId = t._id;
+      return copy;
+    });
+
+    tasks = fromNakladky.concat(adhoc).sort(function(a,b){ return String(b.datum||"").localeCompare(String(a.datum||"")); });
+    renderUkolyList(); renderTaskPicker(); renderPrehled();
   }
 
   // ---------------- identity bar ----------------
@@ -434,7 +527,9 @@
     if (!zakaznik){ msg.textContent = "Vyplň zákazníka."; msg.className="form-msg err"; return; }
     if (nuForm.urceni === "trideni" && nuForm.pracovnik.length === 0){ msg.textContent = "Vyber, kdo bude třídit."; msg.className="form-msg err"; return; }
     var fotky = parseFotky(document.getElementById("nu-fotky").value);
-    db.collection("ukoly").add({
+    // nakladkaId: null = ručně založený záznam mimo Dashboard (viz rebuildTasks).
+    db.collection("tridici_protokoly").add({
+      nakladkaId: null,
       datum: nuForm.datum, zakaznik: zakaznik, pocet_palet: pocet, urceni: nuForm.urceni,
       pracovnik: nuForm.pracovnik.slice(), fotky: fotky, stav: "novy",
       zalozil: currentZapisovatel,
@@ -634,12 +729,33 @@
       ulozeno: new Date().toISOString()
     };
     var planovanoIds = zamestnanci.map(function(z){ return z.pracovnik; });
-    var op = selectedTaskId
-      ? db.collection("ukoly").doc(selectedTaskId).update({ stav:"hotovo", vysledek: vysledek })
-      : db.collection("ukoly").add({
-          datum: vysledek.datum, zakaznik: firma, pocet_palet: radky.reduce(function(s,r){return s+r.dobre+r.poskozene;},0),
-          pracovnik: planovanoIds, zalozil: currentZapisovatel, stav:"hotovo", vysledek: vysledek, vytvoreno: new Date().toISOString()
-        });
+    var pocetZjisteny = radky.reduce(function(s,r){return s+r.dobre+r.poskozene;},0);
+    var task = selectedTaskId ? tasks.filter(function(t){ return t._id === selectedTaskId; })[0] : null;
+    var op;
+    if (task && task._source === "nakladka" && task._tpId){
+      // Oprava dřívějšího výsledku u úkolu z Dashboardu — nakladka.stav je už "vyrizene".
+      op = db.collection("tridici_protokoly").doc(task._tpId).update({ stav:"hotovo", vysledek: vysledek });
+    } else if (task && task._source === "nakladka"){
+      // První uložení výsledku u úkolu z Dashboardu — založí záznam a zároveň
+      // označí vykládku v Dashboardu jako vyřízenou, ať zmizí z obou front.
+      var nakladkaId = task._nakladkaId;
+      op = db.collection("tridici_protokoly").add({
+        nakladkaId: nakladkaId, datum: vysledek.datum, zakaznik: firma, pocet_palet: pocetZjisteny,
+        pracovnik: planovanoIds, zalozil: "dashboard", stav:"hotovo", vysledek: vysledek,
+        vytvoreno: new Date().toISOString()
+      }).then(function(){
+        return db.collection("nakladky").doc(nakladkaId).update({ stav: "vyrizene" });
+      });
+    } else if (task && task._source === "adhoc"){
+      op = db.collection("tridici_protokoly").doc(task._tpId).update({ stav:"hotovo", vysledek: vysledek });
+    } else {
+      // Zpracováno bez výběru úkolu (ad hoc, přímo v záložce Zpracovat).
+      op = db.collection("tridici_protokoly").add({
+        nakladkaId: null, datum: vysledek.datum, zakaznik: firma, pocet_palet: pocetZjisteny,
+        pracovnik: planovanoIds, zalozil: currentZapisovatel, stav:"hotovo", vysledek: vysledek,
+        vytvoreno: new Date().toISOString()
+      });
+    }
     op.then(function(){
       msg.textContent = "Uloženo ✓"; msg.className = "form-msg ok";
     }).catch(function(e){ console.error(e); msg.textContent = "Uložení se nepovedlo."; msg.className="form-msg err"; });
