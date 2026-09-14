@@ -276,14 +276,14 @@
     <div class="section-stack">
       <div class="card">
         <h2>Hotové protokoly</h2>
-        <p class="hint">Podklad pro objednávku — zatím jako čitelný textový souhrn ke zkopírování, dokud neupřesníme přesný cílový formát.</p>
+        <p class="hint">U každého protokolu je dole „Verze pro zákazníka" — čísla se můžou lišit od reality (různá jednání se zákazníky). Z ní appka vygeneruje PDF k odeslání.</p>
         <div id="prehled-list"></div>
       </div>
     </div>
   </section>
 
   <footer class="doc-footer">
-    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; přesný cílový formát objednávky (export je zatím obecný textový souhrn); typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
+    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; PDF pro zákazníka je první návrh vzhledu, čeká na schválení; typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
   </footer>
 
 </div>
@@ -364,6 +364,12 @@
 
   var resultRows = []; // {id, typ, dobre, poskozene}
   function emptyRows(){ return FIXED_TYPES.map(function(t){ return { id: uid(), typ:t, dobre:0, poskozene:0 }; }); }
+
+  // Editovaná "verze pro zákazníka" per protokol (_tpId -> [{typ,dobre,poskozene}]) — viz
+  // renderPrehled/saveAndGeneratePdf. Výchozí = kopie reality (vysledek.radky), dokud appka
+  // nenačte uloženou zakaznicka_verze z Firestore. Čísla se mohou lišit od reality podle
+  // domluvy se zákazníkem — proto oddělené pole, ne editace vysledek.radky napřímo.
+  var zakRowsByTask = {};
 
   // Appka řeší jen třídění (žádné "Oprava" / "Rovnou sklad" určení) — na rozdíl
   // od appky Dashboard, která tyhle jiné určení dovozu taky zná.
@@ -747,25 +753,118 @@
     var wrap = document.getElementById("prehled-list");
     var done = tasks.filter(function(t){ return t.stav === "hotovo" && t.vysledek; });
     if (done.length === 0){
-      wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s textovým souhrnem k zkopírování.</p></div>';
+      wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s PDF protokolem pro zákazníka.</p></div>';
       return;
     }
     wrap.innerHTML = done.map(function(t){
       var v = t.vysledek;
+      var tpId = t._tpId;
+      if (!zakRowsByTask[tpId]){
+        var src = (t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length) ? t.zakaznicka_verze.radky : (v.radky||[]);
+        zakRowsByTask[tpId] = src.map(function(r){ return { typ:r.typ, dobre:r.dobre||0, poskozene:r.poskozene||0 }; });
+      }
       var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
       var names = zamList.join(", ") || "—";
-      var lines = ["TŘÍDICÍ PROTOKOL", "Firma: "+v.firma, "Datum: "+fmtDateCZ(v.datum), "Zaměstnanci: "+names, "Zapsal: "+zapisovatelName(v.zapsal), ""];
-      (v.radky||[]).forEach(function(r){ lines.push(r.typ+": dobré "+r.dobre+", poškozené "+r.poskozene); });
-      if (v.poznamka) { lines.push(""); lines.push("Poznámka: "+v.poznamka); }
-      var text = lines.join("\n");
       var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
+      var zakRows = zakRowsByTask[tpId];
+      var zakRowsHtml = zakRows.map(function(r, idx){
+        return '<tr><td>'+escapeHtml(r.typ)+'</td>'+
+          '<td><input type="number" min="0" step="1" value="'+r.dobre+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="dobre"></td>'+
+          '<td><input type="number" min="0" step="1" value="'+r.poskozene+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="poskozene"></td></tr>';
+      }).join("");
+      var savedNote = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
+        ? ("Uloženo · naposledy upravil " + zapisovatelName(t.zakaznicka_verze.upravil))
+        : "Zatím neuloženo — výchozí čísla jsou stejná jako realita výš, uprav podle domluvy se zákazníkem.";
       return '<div class="task-card" style="flex-direction:column;align-items:stretch;">'+
         '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span><span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
         renderFotkyLinks(t.fotky)+'</div>'+
-        '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
-        '<div class="export-box" style="margin-top:10px;"><textarea readonly>'+escapeHtml(text)+'</textarea></div>'+
+        '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ (realita)</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+        (v.poznamka ? '<div class="hint" style="margin-top:6px;"><b>Poznámka (interní):</b> '+escapeHtml(v.poznamka)+'</div>' : '')+
+        '<div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'+
+          '<h3 style="font-family:var(--font-display);font-size:15px;margin:0 0 3px;">Verze pro zákazníka</h3>'+
+          '<p class="hint" style="margin:0 0 8px;">'+escapeHtml(savedNote)+'</p>'+
+          '<div class="table-scroll"><table class="rows"><thead><tr><th>Typ palety</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+zakRowsHtml+'</tbody></table></div>'+
+          '<div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;">'+
+            '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'">Uložit a vygenerovat PDF pro zákazníka</button>'+
+            '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
+          '</div>'+
+        '</div>'+
         '</div>';
     }).join("");
+
+    wrap.querySelectorAll("input[data-tp]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var tid = inp.getAttribute("data-tp");
+        var idx = Number(inp.getAttribute("data-idx"));
+        var field = inp.getAttribute("data-field");
+        zakRowsByTask[tid][idx][field] = Number(inp.value) || 0;
+      });
+    });
+    wrap.querySelectorAll("[data-pdf-tp]").forEach(function(btn){
+      btn.addEventListener("click", function(){ saveAndGeneratePdf(btn.getAttribute("data-pdf-tp")); });
+    });
+  }
+
+  function saveAndGeneratePdf(tpId){
+    var task = tasks.filter(function(t){ return t._tpId === tpId; })[0];
+    var msgEl = document.getElementById("pdf-msg-" + tpId);
+    if (!task){ return; }
+    var radky = (zakRowsByTask[tpId]||[]).map(function(r){ return { typ:r.typ, dobre:r.dobre||0, poskozene:r.poskozene||0 }; });
+    var zakaznickaVerze = { radky: radky, ulozeno: new Date().toISOString(), upravil: currentZapisovatel };
+    db.collection("tridici_protokoly").doc(tpId).update({ zakaznicka_verze: zakaznickaVerze }).then(function(){
+      if (msgEl){ msgEl.textContent = "Uloženo ✓"; msgEl.className = "form-msg ok"; }
+      openZakaznickyPdf(task.vysledek.firma, task.vysledek.datum, radky);
+    }).catch(function(e){
+      console.error(e);
+      if (msgEl){ msgEl.textContent = "Nepovedlo se uložit."; msgEl.className = "form-msg err"; }
+    });
+  }
+
+  // Otevře čistou tiskovou stránku v novém okně (žádná appka kolem, jen protokol) —
+  // "Vytisknout / Uložit jako PDF" pak dá reálný PDF soubor k odeslání zákazníkovi.
+  // První verze vzhledu — čeká na schválení Lukášem (viz footer appky).
+  function buildZakaznickyPdfHtml(firma, datumIso, radky){
+    var rowsHtml = radky.map(function(r){
+      return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(r.dobre||0)+'</td><td>'+(r.poskozene||0)+'</td></tr>';
+    }).join("");
+    var totalDobre = radky.reduce(function(s,r){ return s + (Number(r.dobre)||0); }, 0);
+    var totalPosk = radky.reduce(function(s,r){ return s + (Number(r.poskozene)||0); }, 0);
+    var vystaveno = new Date().toLocaleString("cs-CZ");
+    return '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">'+
+      '<title>Třídicí protokol – '+escapeHtml(firma)+'</title>'+
+      '<style>'+
+      'body{font-family:Georgia,"Times New Roman",serif;color:#1B2422;max-width:680px;margin:40px auto;padding:0 24px;}'+
+      '.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1B2422;padding-bottom:12px;margin-bottom:24px;gap:16px;flex-wrap:wrap;}'+
+      '.co{font-family:Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:.03em;}'+
+      '.co small{display:block;font-weight:500;font-size:11px;letter-spacing:.08em;color:#666;text-transform:uppercase;margin-top:2px;}'+
+      'h1{font-size:22px;margin:0 0 4px;}'+
+      '.meta{font-family:Arial,sans-serif;font-size:14px;margin-bottom:20px;color:#333;}'+
+      '.meta b{color:#000;}'+
+      'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;margin-top:8px;}'+
+      'th,td{border:1px solid #ccc;padding:8px 10px;text-align:left;}'+
+      'th{background:#f3f3f3;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}'+
+      'td:not(:first-child),th:not(:first-child){text-align:right;}'+
+      'tfoot td{font-weight:700;border-top:2px solid #1B2422;}'+
+      '.foot{margin-top:36px;font-family:Arial,sans-serif;font-size:11px;color:#888;display:flex;justify-content:space-between;}'+
+      '.print-btn{font-family:Arial,sans-serif;margin-bottom:24px;padding:10px 18px;font-size:14px;font-weight:700;border-radius:8px;border:none;background:#BE5322;color:#fff;cursor:pointer;}'+
+      '@media print{.print-btn{display:none;}}'+
+      '</style></head><body>'+
+      '<button class="print-btn" onclick="window.print()">Vytisknout / Uložit jako PDF</button>'+
+      '<div class="hdr"><div class="co">PALETY VÍT<small>Třídění a zpracování palet</small></div><h1>Třídicí protokol</h1></div>'+
+      '<div class="meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
+      '<table><thead><tr><th>Typ palety</th><th>Dobré (ks)</th><th>Poškozené (ks)</th></tr></thead>'+
+      '<tbody>'+rowsHtml+'</tbody>'+
+      '<tfoot><tr><td>Celkem</td><td>'+totalDobre+'</td><td>'+totalPosk+'</td></tr></tfoot>'+
+      '</table>'+
+      '<div class="foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>'+
+      '</body></html>';
+  }
+
+  function openZakaznickyPdf(firma, datumIso, radky){
+    var html = buildZakaznickyPdfHtml(firma, datumIso, radky);
+    var w = window.open("", "_blank");
+    if (!w){ alert("Prohlížeč zablokoval otevření nového okna. Povol vyskakovací okna pro tuhle appku a zkus to znovu."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   // ---------------- tabs ----------------
