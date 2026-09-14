@@ -25,32 +25,8 @@
     --font-body:'IBM Plex Sans',system-ui,sans-serif;
     --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
   }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#121715; --surface:#1B2320; --surface-2:#212A27;
-      --border:#313B37; --border-strong:#455049;
-      --ink:#EAF0ED; --ink-soft:#A7B4AF; --ink-faint:#6E7A75;
-      --accent:#E27B45; --accent-ink:#1B140D; --accent-soft:#3A2A1D;
-      --ai:#B48FD0; --ai-soft:#2E2438;
-      --good:#7FBE85; --good-soft:#1F3323;
-      --damaged:#E08462; --damaged-soft:#3B2620;
-      --pending:#E0BB63; --pending-soft:#3A3120;
-      --focus:#B48FD0;
-      --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-md:0 10px 24px rgba(0,0,0,.4);
-    }
-  }
-  :root[data-theme="dark"]{
-    --bg:#121715; --surface:#1B2320; --surface-2:#212A27;
-    --border:#313B37; --border-strong:#455049;
-    --ink:#EAF0ED; --ink-soft:#A7B4AF; --ink-faint:#6E7A75;
-    --accent:#E27B45; --accent-ink:#1B140D; --accent-soft:#3A2A1D;
-    --ai:#B48FD0; --ai-soft:#2E2438;
-    --good:#7FBE85; --good-soft:#1F3323;
-    --damaged:#E08462; --damaged-soft:#3B2620;
-    --pending:#E0BB63; --pending-soft:#3A3120;
-    --focus:#B48FD0;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-md:0 10px 24px rgba(0,0,0,.4);
-  }
+  /* Appka záměrně nemá tmavý režim — Dashboard a Pokladna ho taky nemají,
+     appky mají jet ve stejném (světlém) vzhledu bez ohledu na systémové nastavení. */
 
   *{box-sizing:border-box;}
   body{ margin:0;background:var(--bg);color:var(--ink); font-family:var(--font-body); padding:20px 16px 56px; -webkit-font-smoothing:antialiased; }
@@ -225,10 +201,6 @@
             <div class="field"><label for="nu-zakaznik">Zákazník</label><input type="text" id="nu-zakaznik" placeholder="např. Diton"></div>
             <div class="field"><label for="nu-pocet">Počet palet podle DL</label><input type="number" id="nu-pocet" min="0" step="1" placeholder="např. 33"></div>
           </div>
-          <div class="field">
-            <label>Určení</label>
-            <div class="chip-grid" id="nu-urceni-chips"></div>
-          </div>
           <div class="field" id="nu-pracovnik-field">
             <label>Kdo bude třídit (plán)</label>
             <div class="chip-grid" id="nu-pracovnik-chips"></div>
@@ -246,7 +218,7 @@
 
       <div class="card">
         <h2>Úkoly třídění</h2>
-        <p class="hint">Živě z appky Dashboard (vykládky určené na „Třídění") + ruční záznamy z „Nová vykládka" výš. Nové čekají na zpracování, hotové mají uložený výsledek. <span id="nu-jine-count" style="color:var(--ink-faint);"></span></p>
+        <p class="hint">Živě z appky Dashboard (vykládky určené na „Třídění") + ruční záznamy z „Nová vykládka" výš. Nové čekají na zpracování, hotové mají uložený výsledek.</p>
         <div id="ukoly-list"></div>
       </div>
 
@@ -393,12 +365,9 @@
   var resultRows = []; // {id, typ, dobre, poskozene}
   function emptyRows(){ return FIXED_TYPES.map(function(t){ return { id: uid(), typ:t, dobre:0, poskozene:0 }; }); }
 
-  var URCENI = [
-    { id:"trideni", name:"Třídění" },
-    { id:"oprava",  name:"Oprava" },
-    { id:"sklad",   name:"Rovnou sklad (OK)" }
-  ];
-  var nuForm = { datum: todayISO(), pracovnik: [], urceni: "trideni" };
+  // Appka řeší jen třídění (žádné "Oprava" / "Rovnou sklad" určení) — na rozdíl
+  // od appky Dashboard, která tyhle jiné určení dovozu taky zná.
+  var nuForm = { datum: todayISO(), pracovnik: [] };
   var rForm = { firma:"", datum: todayISO(), zamestnanci: [] }; // zamestnanci: [{id, pracovnik, hodiny}]
 
   function defaultZamRow(pracovnikId){ return { id: uid(), pracovnik: pracovnikId || "", hodiny: 0 }; }
@@ -490,7 +459,7 @@
         datum: n.datum, zakaznik: n.partner, pocet_palet: nakladkaPocetPalet(n),
         pracovnik: pracIds, fotky: nakladkaFotky(n),
         stav: (tp && tp.stav === "hotovo") ? "hotovo" : "novy",
-        zalozil: "dashboard", urceni: "trideni",
+        zalozil: "dashboard",
         vysledek: tp ? tp.vysledek : null
       };
     });
@@ -514,24 +483,6 @@
   }
 
   // ---------------- ukoly tab ----------------
-  function renderUrceniChips(){
-    var wrap = document.getElementById("nu-urceni-chips");
-    wrap.innerHTML = "";
-    URCENI.forEach(function(u){
-      var chip = document.createElement("button");
-      chip.type = "button"; chip.className = "chip";
-      chip.setAttribute("aria-pressed", nuForm.urceni === u.id ? "true":"false");
-      chip.textContent = u.name;
-      chip.addEventListener("click", function(){
-        nuForm.urceni = u.id;
-        renderUrceniChips();
-        document.getElementById("nu-pracovnik-field").hidden = (nuForm.urceni !== "trideni");
-      });
-      wrap.appendChild(chip);
-    });
-    document.getElementById("nu-pracovnik-field").hidden = (nuForm.urceni !== "trideni");
-  }
-
   function renderPracovnikChips(containerId, formObj, single){
     var wrap = document.getElementById(containerId);
     wrap.innerHTML = "";
@@ -560,25 +511,24 @@
     var pocet = Number(document.getElementById("nu-pocet").value || 0);
     var msg = document.getElementById("nu-msg");
     if (!zakaznik){ msg.textContent = "Vyplň zákazníka."; msg.className="form-msg err"; return; }
-    if (nuForm.urceni === "trideni" && nuForm.pracovnik.length === 0){ msg.textContent = "Vyber, kdo bude třídit."; msg.className="form-msg err"; return; }
+    if (nuForm.pracovnik.length === 0){ msg.textContent = "Vyber, kdo bude třídit."; msg.className="form-msg err"; return; }
     var fotky = parseFotky(document.getElementById("nu-fotky").value);
     // nakladkaId: null = ručně založený záznam mimo Dashboard (viz rebuildTasks).
     db.collection("tridici_protokoly").add({
       nakladkaId: null,
-      datum: nuForm.datum, zakaznik: zakaznik, pocet_palet: pocet, urceni: nuForm.urceni,
+      datum: nuForm.datum, zakaznik: zakaznik, pocet_palet: pocet,
       pracovnik: nuForm.pracovnik.slice(), fotky: fotky, stav: "novy",
       zalozil: currentZapisovatel,
       vytvoreno: new Date().toISOString()
     }).then(function(){
-      msg.textContent = nuForm.urceni === "trideni" ? "Vykládka uložena ✓ — objevila se ve frontě úkolů níž." : "Vykládka uložena ✓ (mimo třídění, appka Třídicí protokol ji dál neřeší).";
+      msg.textContent = "Vykládka uložena ✓ — objevila se ve frontě úkolů níž.";
       msg.className="form-msg ok";
       document.getElementById("nu-zakaznik").value = "";
       document.getElementById("nu-pocet").value = "";
       document.getElementById("nu-fotky").value = "";
-      nuForm.datum = todayISO(); nuForm.pracovnik = []; nuForm.urceni = "trideni";
+      nuForm.datum = todayISO(); nuForm.pracovnik = [];
       document.getElementById("nu-datum").value = fmtDateCZ(nuForm.datum);
       renderPracovnikChips("nu-pracovnik-chips", nuForm, false);
-      renderUrceniChips();
     }).catch(function(e){ console.error(e); msg.textContent = "Nepovedlo se uložit."; msg.className="form-msg err"; });
   }
 
@@ -600,13 +550,9 @@
     }).join("") + '</div>';
   }
 
-  function trideniTasks(){ return tasks.filter(function(t){ return (t.urceni||"trideni") === "trideni"; }); }
-
   function renderUkolyList(){
     var wrap = document.getElementById("ukoly-list");
-    var list = trideniTasks();
-    var jine = tasks.length - list.length;
-    document.getElementById("nu-jine-count").textContent = jine > 0 ? ("(mimo třídění: " + jine + ")") : "";
+    var list = tasks;
     if (list.length === 0){
       wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné úkoly třídění</h3><p>Ulož výš vykládku s určením „Třídění" — objeví se tady automaticky, v ostrém provozu by ji appka Dashboard vytvořila sama.</p></div>';
       return;
@@ -638,7 +584,7 @@
   // ---------------- zpracovat tab ----------------
   function renderTaskPicker(){
     var wrap = document.getElementById("task-picker");
-    var open = trideniTasks().filter(function(t){ return t.stav !== "hotovo"; });
+    var open = tasks.filter(function(t){ return t.stav !== "hotovo"; });
     var chips = open.map(function(t){
       return '<button type="button" class="task-pick-chip" data-id="'+t._id+'" aria-pressed="'+(t._id===selectedTaskId?"true":"false")+'">'+
         escapeHtml(t.zakaznik)+' · '+fmtDateCZ(t.datum)+'</button>';
@@ -799,7 +745,7 @@
   // ---------------- prehled tab ----------------
   function renderPrehled(){
     var wrap = document.getElementById("prehled-list");
-    var done = trideniTasks().filter(function(t){ return t.stav === "hotovo" && t.vysledek; });
+    var done = tasks.filter(function(t){ return t.stav === "hotovo" && t.vysledek; });
     if (done.length === 0){
       wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s textovým souhrnem k zkopírování.</p></div>';
       return;
@@ -840,7 +786,6 @@
   document.getElementById("btn-nu-save").addEventListener("click", saveNewTask);
   document.getElementById("btn-save-result").addEventListener("click", saveResult);
 
-  renderUrceniChips();
   loadSelectedTaskIntoForm();
   renderUkolyList();
   renderTaskPicker();
