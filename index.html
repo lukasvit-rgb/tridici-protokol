@@ -7,57 +7,57 @@
 <meta name="description" content="Úkoly třídění z vykládek a zápis výsledku třídění — appka pro dílnu Palety Vít.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#E9EDEC; --surface:#FFFFFF; --surface-2:#F3F5F4;
-    --border:#D5DAD8; --border-strong:#B9C1BE;
-    --ink:#1B2422; --ink-soft:#556360; --ink-faint:#8B9995;
-    --accent:#BE5322; --accent-ink:#FFF9F5; --accent-soft:#F6E4D8;
-    --ai:#7B4FA0; --ai-soft:#EDE4F2;
-    --good:#3D7A49; --good-soft:#E3EFE2;
-    --damaged:#AC4526; --damaged-soft:#F3E1D9;
-    --pending:#A9781F; --pending-soft:#F1E9D6;
-    --focus:#7B4FA0;
-    --shadow-sm:0 1px 2px rgba(20,28,26,.07); --shadow-md:0 6px 18px rgba(20,28,26,.10);
-    --radius-s:8px; --radius-m:14px; --radius-l:22px;
-    --font-display:'Archivo',system-ui,sans-serif;
-    --font-body:'IBM Plex Sans',system-ui,sans-serif;
-    --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+    --bg:#f2f2f7; --surface:#ffffff; --surface-2:#e8e8ed; --surface-3:#d8d8dd;
+    --border:#cccccc; --border-strong:#bbbbbb;
+    --ink:#111111; --ink-soft:#888888; --ink-faint:#bbbbbb;
+    --accent:#111111; --accent-ink:#ffffff; --accent-soft:#d8d8dd;
+    --good:#27ae60; --good-soft:#d4edda;
+    --damaged:#e05555; --damaged-soft:#fde8e8;
+    --pending:#e6a800; --pending-soft:#faf0d8;
+    --focus:#111111;
+    --shadow-sm:0 1px 2px rgba(17,17,17,.08); --shadow-md:0 6px 18px rgba(17,17,17,.12);
+    --radius-s:8px; --radius-m:10px; --radius-l:16px;
+    --font-display:'Barlow Condensed',system-ui,sans-serif;
+    --font-body:'Barlow',system-ui,sans-serif;
+    --font-mono:'Barlow Condensed','SFMono-Regular',Consolas,monospace;
   }
-  /* Appka záměrně nemá tmavý režim — Dashboard a Pokladna ho taky nemají,
-     appky mají jet ve stejném (světlém) vzhledu bez ohledu na systémové nastavení. */
+  /* Appka jede ve stejném vizuálním stylu jako appky Dashboard a Pokladna —
+     stejné fonty (Barlow/Barlow Condensed), stejná neutrální šedá paleta,
+     žádná oranžová/brand barva, žádný tmavý režim. */
 
   *{box-sizing:border-box;}
   body{ margin:0;background:var(--bg);color:var(--ink); font-family:var(--font-body); padding:20px 16px 56px; -webkit-font-smoothing:antialiased; }
   @media (min-width:720px){ body{ padding:32px 32px 64px; } }
-  .wrap{ max-width:1000px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
+  .wrap{ max-width:1000px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }
 
-  .app-header{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; }
-  .brand{ display:flex; flex-direction:column; gap:4px; }
-  .brand .eyebrow{ font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
-  .brand h1{ font-family:var(--font-display); font-weight:800; font-size:clamp(24px,4vw,32px); margin:0; letter-spacing:-.01em; text-wrap:balance; }
-  .brand .sub{ color:var(--ink-soft); font-size:14.5px; }
+  .app-header{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); padding:16px 20px; box-shadow:var(--shadow-sm); }
+  .brand{ display:flex; flex-direction:column; gap:3px; }
+  .brand .eyebrow{ font-family:var(--font-display); font-weight:900; font-size:11px; letter-spacing:.25em; text-transform:uppercase; color:var(--ink-soft); }
+  .brand h1{ font-family:var(--font-display); font-weight:800; font-size:clamp(22px,4vw,28px); margin:0; letter-spacing:.01em; text-transform:uppercase; }
+  .brand .sub{ color:var(--ink-soft); font-size:13.5px; }
 
-  .tabs{ display:flex; gap:6px; background:var(--surface-2); padding:5px; border-radius:999px; border:1px solid var(--border); flex-wrap:wrap; }
-  .tab-btn{ font-family:var(--font-body); font-weight:600; font-size:14px; color:var(--ink-soft); background:transparent; border:none; padding:10px 16px; border-radius:999px; cursor:pointer; }
+  .tabs{ display:flex; gap:5px; background:var(--surface-2); padding:5px; border-radius:10px; border:1px solid var(--border); flex-wrap:wrap; }
+  .tab-btn{ font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); background:transparent; border:none; padding:9px 16px; border-radius:8px; cursor:pointer; }
   .tab-btn[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm); }
   .tab-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 
-  .version-note{ display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m); padding:12px 14px; font-size:13.5px; color:var(--ink-soft); box-shadow:var(--shadow-sm); }
-  .version-note .dot{ width:8px;height:8px;border-radius:50%;background:var(--accent); margin-top:6px; flex:none; }
+  .version-note{ display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m); padding:12px 14px; font-size:13px; color:var(--ink-soft); box-shadow:var(--shadow-sm); }
+  .version-note .dot{ width:8px;height:8px;border-radius:50%;background:var(--ink-faint); margin-top:6px; flex:none; }
   .version-note b{ color:var(--ink); }
 
-  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); padding:20px; box-shadow:var(--shadow-sm); }
-  .card h2{ font-family:var(--font-display); font-size:17px; margin:0 0 3px; letter-spacing:-.005em; }
-  .card .hint{ color:var(--ink-soft); font-size:13.5px; margin:0 0 14px; }
-  .section-stack{ display:flex; flex-direction:column; gap:16px; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); padding:18px; box-shadow:var(--shadow-sm); }
+  .card h2{ font-family:var(--font-display); font-weight:800; font-size:16px; margin:0 0 3px; letter-spacing:.03em; text-transform:uppercase; }
+  .card .hint{ color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
+  .section-stack{ display:flex; flex-direction:column; gap:14px; }
 
   .field{ display:flex; flex-direction:column; gap:6px; }
-  .field label{ font-size:13px; font-weight:600; color:var(--ink-soft); }
+  .field label{ font-family:var(--font-display); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
   .field input[type="text"], .field input[type="number"], .field select, .field textarea{
-    font-family:var(--font-body); font-size:15.5px; padding:11px 13px; border-radius:var(--radius-s);
-    border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); width:100%;
+    font-family:var(--font-body); font-size:15px; padding:11px 13px; border-radius:var(--radius-s);
+    border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); width:100%;
   }
   .field textarea{ resize:vertical; min-height:52px; }
   .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
@@ -65,49 +65,52 @@
   .field-row.three{ grid-template-columns:1fr 1fr 1fr; }
   @media (max-width:640px){ .field-row, .field-row.three{ grid-template-columns:1fr; } }
 
-  .chip-grid{ display:flex; flex-wrap:wrap; gap:9px; }
-  .chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); font-weight:600; font-size:14px; cursor:pointer; }
+  .chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:.03em; cursor:pointer; }
   .chip .swatch{ width:10px; height:10px; border-radius:50%; }
-  .chip[aria-pressed="true"]{ background:var(--chip-c-soft,var(--accent-soft)); border-color:var(--chip-c,var(--accent)); }
+  .chip[aria-pressed="true"]{ background:var(--chip-c-soft,var(--surface-3)); border-color:var(--chip-c,var(--ink)); }
   .chip:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 
-  .btn{ font-family:var(--font-body); font-weight:700; font-size:15px; padding:12px 20px; border-radius:999px; border:none; cursor:pointer; }
+  .btn{ font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:.05em; text-transform:uppercase; padding:12px 20px; border-radius:9px; border:none; cursor:pointer; }
   .btn:active{ transform:scale(.98); }
-  .btn.primary{ background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow-sm); }
+  .btn.primary{ background:#111111; color:#ffffff; box-shadow:var(--shadow-sm); }
   .btn.primary:disabled{ opacity:.4; cursor:not-allowed; }
-  .btn.ghost{ background:transparent; color:var(--ink-soft); border:1.5px solid var(--border-strong); }
-  .btn.small{ padding:8px 14px; font-size:13px; }
+  .btn.ghost{ background:var(--surface-2); color:var(--ink-soft); border:1px solid var(--border); }
+  .btn.small{ padding:8px 14px; font-size:12px; }
   .btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
-  .form-msg{ font-size:13.5px; font-weight:600; min-height:18px; }
+  .form-msg{ font-size:13px; font-weight:600; min-height:18px; }
   .form-msg.err{ color:var(--damaged); }
   .form-msg.ok{ color:var(--good); }
 
   /* task list */
-  .task-card{ border:1.5px solid var(--border); border-radius:var(--radius-m); padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; }
+  .task-card{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; }
   .task-card + .task-card{ margin-top:10px; }
   .task-main{ display:flex; flex-direction:column; gap:3px; }
-  .task-main .zak{ font-family:var(--font-display); font-weight:700; font-size:15.5px; }
-  .task-main .meta{ font-size:12.5px; color:var(--ink-soft); font-family:var(--font-mono); }
-  .status-badge{ font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; }
-  .status-badge.novy{ background:var(--pending-soft); color:var(--pending); }
-  .status-badge.hotovo{ background:var(--good-soft); color:var(--good); }
+  .task-main .zak{ font-family:var(--font-display); font-weight:700; font-size:16px; }
+  .task-main .meta{ font-size:12px; color:var(--ink-soft); }
+  .status-badge{ font-family:var(--font-display); font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:4px 11px; border-radius:999px; white-space:nowrap; }
+  .status-badge.novy{ background:var(--pending-soft); color:#96700a; }
+  .status-badge.hotovo{ background:var(--good-soft); color:#1a7a30; }
   .task-actions{ display:flex; gap:8px; align-items:center; }
 
   .empty-state{ text-align:center; padding:30px 16px; color:var(--ink-soft); }
-  .empty-state .glyph{ width:48px; height:48px; margin:0 auto 12px; border-radius:14px; background:var(--surface-2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; font-size:17px; color:var(--ink-faint); }
-  .empty-state h3{ font-family:var(--font-display); font-size:15.5px; margin:0 0 4px; color:var(--ink); }
-  .empty-state p{ margin:0; font-size:13.5px; max-width:380px; margin-inline:auto; }
+  .empty-state .glyph{ width:48px; height:48px; margin:0 auto 12px; border-radius:12px; background:var(--surface-2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; font-size:16px; color:var(--ink-faint); }
+  .empty-state h3{ font-family:var(--font-display); font-weight:800; font-size:15px; margin:0 0 4px; color:var(--ink); text-transform:uppercase; }
+  .empty-state p{ margin:0; font-size:13px; max-width:380px; margin-inline:auto; }
 
   /* zpracovat */
   .task-picker{ display:flex; flex-wrap:wrap; gap:8px; }
-  .task-pick-chip{ padding:9px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface); font-size:13.5px; font-weight:600; cursor:pointer; }
-  .task-pick-chip[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); }
+  .task-pick-chip{ padding:9px 14px; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface-2); font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
+  .task-pick-chip[aria-pressed="true"]{ background:var(--surface-3); border-color:var(--ink); color:var(--ink); }
 
   table.rows{ width:100%; border-collapse:collapse; font-size:14px; }
-  table.rows th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); padding:0 8px 8px; font-weight:600; border-bottom:1.5px solid var(--border); }
+  table.rows th{ text-align:left; font-family:var(--font-display); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); padding:0 8px 8px; font-weight:700; border-bottom:1.5px solid var(--border); }
   table.rows td{ padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
-  table.rows input[type="number"]{ width:72px; padding:7px 8px; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
-  .row-del-btn{ background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12.5px; }
+  table.rows input[type="number"]{ width:72px; padding:7px 8px; font-family:var(--font-display); font-variant-numeric:tabular-nums; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); }
+  table.rows input[type="text"]{ padding:7px 8px; font-family:var(--font-body); border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); }
+  table.rows select{ font-family:var(--font-body); font-size:13px; padding:6px 8px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); }
+  table.rows tfoot td{ font-family:var(--font-display); font-weight:800; letter-spacing:.02em; border-top:2px solid var(--ink); background:var(--surface-2); }
+  .row-del-btn{ background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:12px;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em; }
   .row-del-btn:hover{ color:var(--damaged); }
   .table-scroll{ overflow-x:auto; }
 
@@ -116,36 +119,36 @@
 
   .zam-row{ display:grid; grid-template-columns:1fr 100px auto; gap:10px; align-items:center; margin-bottom:8px; }
   @media (max-width:520px){ .zam-row{ grid-template-columns:1fr 90px auto; } }
-  .zam-row select{ font-family:var(--font-body); font-size:14.5px; padding:10px 11px; border-radius:var(--radius-s); border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink); width:100%; }
-  .zam-row input[type="number"]{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:center; }
+  .zam-row select{ font-family:var(--font-body); font-size:14px; padding:10px 11px; border-radius:var(--radius-s); border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink); width:100%; }
+  .zam-row input[type="number"]{ font-family:var(--font-display); font-variant-numeric:tabular-nums; text-align:center; }
   .zam-del{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:13px; padding:6px; }
   .zam-del:hover{ color:var(--damaged); }
 
   .foto-links{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-  .foto-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft); text-decoration:none; }
+  .foto-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft); text-decoration:none; }
   .foto-chip img{ width:16px; height:16px; border-radius:3px; object-fit:cover; }
-  .foto-chip:hover{ border-color:var(--accent); color:var(--ink); }
+  .foto-chip:hover{ border-color:var(--ink); color:var(--ink); }
 
   .export-box{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px; }
-  .export-box textarea{ width:100%; min-height:130px; font-family:var(--font-mono); font-size:12.5px; border:1px solid var(--border); border-radius:var(--radius-s); padding:10px; background:var(--surface); color:var(--ink); }
+  .export-box textarea{ width:100%; min-height:130px; font-family:var(--font-display); font-size:12.5px; border:1px solid var(--border); border-radius:var(--radius-s); padding:10px; background:var(--surface); color:var(--ink); }
 
-  footer.doc-footer{ font-size:12.5px; color:var(--ink-faint); border-top:1px solid var(--border); padding-top:16px; line-height:1.6; }
+  footer.doc-footer{ font-size:12px; color:var(--ink-faint); border-top:1px solid var(--border); padding-top:16px; line-height:1.6; }
   footer.doc-footer b{ color:var(--ink-soft); }
 
   /* login */
-  .login-ov{ position:fixed; inset:0; background:var(--bg); z-index:400; display:none; align-items:center; justify-content:center; padding:20px; }
+  .login-ov{ position:fixed; inset:0; background:#0a0a0a; z-index:400; display:none; align-items:center; justify-content:center; padding:20px; }
   .login-ov.open{ display:flex; }
-  .login-box{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow-md); width:100%; max-width:340px; padding:28px 24px; }
-  .login-logo{ font-family:var(--font-display); font-weight:800; font-size:20px; letter-spacing:-.01em; text-align:center; margin-bottom:2px; }
-  .login-sub{ font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); text-align:center; margin-bottom:22px; }
+  .login-box{ background:var(--surface); border-radius:16px; box-shadow:var(--shadow-md); width:100%; max-width:340px; padding:26px 22px; }
+  .login-logo{ font-family:var(--font-display); font-weight:900; font-size:20px; letter-spacing:5px; text-transform:uppercase; text-align:center; margin-bottom:2px; }
+  .login-sub{ font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--ink-soft); text-align:center; margin-bottom:22px; }
   .login-box .field{ margin-bottom:12px; }
-  .login-err{ color:var(--damaged); font-size:13px; margin:-2px 0 12px; display:none; }
+  .login-err{ color:var(--damaged); font-size:12px; margin:-6px 0 14px; display:none; }
   .login-box .btn.primary{ width:100%; margin-top:6px; }
 
   /* who-chip (přihlášený uživatel) */
-  .who-chip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 14px; font-size:13.5px; font-weight:600; cursor:pointer; color:var(--ink); }
+  .who-chip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 14px; font-family:var(--font-display); font-size:12.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; cursor:pointer; color:var(--ink); }
   .who-chip .ico{ color:var(--ink-faint); font-size:14px; }
-  .who-chip:hover{ border-color:var(--accent); }
+  .who-chip:hover{ border-color:var(--ink); }
 
   [hidden]{ display:none !important; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
@@ -283,7 +286,7 @@
   </section>
 
   <footer class="doc-footer">
-    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; PDF pro zákazníka je první návrh vzhledu, čeká na schválení; typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
+    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; ceny ve „Verzi pro zákazníka" appka nikdy nedosazuje sama — vyplňují se ručně podle domluvy se zákazníkem, nejsou to výkupní ceny appky Výkup; typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
   </footer>
 
 </div>
@@ -365,11 +368,42 @@
   var resultRows = []; // {id, typ, dobre, poskozene}
   function emptyRows(){ return FIXED_TYPES.map(function(t){ return { id: uid(), typ:t, dobre:0, poskozene:0 }; }); }
 
-  // Editovaná "verze pro zákazníka" per protokol (_tpId -> [{typ,dobre,poskozene}]) — viz
-  // renderPrehled/saveAndGeneratePdf. Výchozí = kopie reality (vysledek.radky), dokud appka
-  // nenačte uloženou zakaznicka_verze z Firestore. Čísla se mohou lišit od reality podle
-  // domluvy se zákazníkem — proto oddělené pole, ne editace vysledek.radky napřímo.
+  // Editovaná "verze pro zákazníka" per protokol (_tpId -> [{typ,stav,mnozstvi,cena}]) — viz
+  // renderPrehled/saveAndGeneratePdf. Výchozí = kopie reality (vysledek.radky) rozdělená na
+  // samostatné řádky dobré/poškozené s cenou 0, dokud appka nenačte uloženou zakaznicka_verze
+  // z Firestore. Ceny appka nikdy nedosazuje sama (výkupní ceník appky Výkup je pro jiný účel —
+  // platba dodavateli, ne fakturace zákazníkovi) — vyplňují se ručně podle domluvy. Čísla i ceny
+  // se mohou lišit od reality podle jednání se zákazníkem — proto oddělené pole, ne editace
+  // vysledek.radky napřímo. Každá položka (typ + stav) má vlastní řádek, i poškozené kusy.
   var zakRowsByTask = {};
+  var STAV_LABELS = { dobre: "Dobré", poskozene: "Poškozené" };
+  function fmtKc(n){ return (Number(n)||0).toLocaleString("cs-CZ") + " Kč"; }
+
+  // Postaví výchozí řádky "verze pro zákazníka" z reality (vysledek.radky) — každý typ se
+  // rozpadne až na 2 řádky (dobré / poškozené), jen pokud má nenulové množství.
+  function buildDefaultZakRows(radky){
+    var out = [];
+    (radky||[]).forEach(function(r){
+      if ((r.dobre||0) > 0) out.push({ id:uid(), typ:r.typ, stav:"dobre", mnozstvi:r.dobre||0, cena:0 });
+      if ((r.poskozene||0) > 0) out.push({ id:uid(), typ:r.typ, stav:"poskozene", mnozstvi:r.poskozene||0, cena:0 });
+    });
+    return out;
+  }
+  // Načte uloženou zakaznicka_verze.radky — podporuje i starší formát {typ,dobre,poskozene}
+  // (appka ho uměla ukládat dřív, než přibyly ceny a oddělené řádky) a rozpadne ho stejně.
+  function normalizeSavedZakRows(saved){
+    var out = [];
+    (saved||[]).forEach(function(r){
+      if (!r) return;
+      if (r.stav){
+        out.push({ id:uid(), typ:r.typ||"", stav:(r.stav==="poskozene"?"poskozene":"dobre"), mnozstvi:Number(r.mnozstvi)||0, cena:Number(r.cena)||0 });
+      } else {
+        if ((r.dobre||0) > 0) out.push({ id:uid(), typ:r.typ||"", stav:"dobre", mnozstvi:r.dobre||0, cena:0 });
+        if ((r.poskozene||0) > 0) out.push({ id:uid(), typ:r.typ||"", stav:"poskozene", mnozstvi:r.poskozene||0, cena:0 });
+      }
+    });
+    return out;
+  }
 
   // Appka řeší jen třídění (žádné "Oprava" / "Rovnou sklad" určení) — na rozdíl
   // od appky Dashboard, která tyhle jiné určení dovozu taky zná.
@@ -760,30 +794,46 @@
       var v = t.vysledek;
       var tpId = t._tpId;
       if (!zakRowsByTask[tpId]){
-        var src = (t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length) ? t.zakaznicka_verze.radky : (v.radky||[]);
-        zakRowsByTask[tpId] = src.map(function(r){ return { typ:r.typ, dobre:r.dobre||0, poskozene:r.poskozene||0 }; });
+        var savedRadky = (t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length) ? t.zakaznicka_verze.radky : null;
+        zakRowsByTask[tpId] = savedRadky ? normalizeSavedZakRows(savedRadky) : buildDefaultZakRows(v.radky);
       }
       var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
       var names = zamList.join(", ") || "—";
       var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
       var zakRows = zakRowsByTask[tpId];
+      var zakTotalKs = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
+      var zakTotalCena = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
       var zakRowsHtml = zakRows.map(function(r, idx){
-        return '<tr><td>'+escapeHtml(r.typ)+'</td>'+
-          '<td><input type="number" min="0" step="1" value="'+r.dobre+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="dobre"></td>'+
-          '<td><input type="number" min="0" step="1" value="'+r.poskozene+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="poskozene"></td></tr>';
+        var subtotal = (Number(r.mnozstvi)||0) * (Number(r.cena)||0);
+        return '<tr>'+
+          '<td><input type="text" value="'+escapeHtml(r.typ)+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="typ" style="width:130px;"></td>'+
+          '<td><select data-tp="'+tpId+'" data-idx="'+idx+'" data-field="stav">'+
+            '<option value="dobre"'+(r.stav==="dobre"?" selected":"")+'>Dobré</option>'+
+            '<option value="poskozene"'+(r.stav==="poskozene"?" selected":"")+'>Poškozené</option>'+
+          '</select></td>'+
+          '<td><input type="number" min="0" step="1" value="'+r.mnozstvi+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="mnozstvi" style="width:64px;"></td>'+
+          '<td><input type="number" min="0" step="1" value="'+r.cena+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="cena" style="width:76px;"></td>'+
+          '<td id="zak-sub-'+tpId+'-'+idx+'" style="font-family:var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap;">'+fmtKc(subtotal)+'</td>'+
+          '<td><button type="button" class="row-del-btn" data-del-zak="'+tpId+'" data-idx="'+idx+'">Smazat</button></td>'+
+        '</tr>';
       }).join("");
       var savedNote = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
         ? ("Uloženo · naposledy upravil " + zapisovatelName(t.zakaznicka_verze.upravil))
-        : "Zatím neuloženo — výchozí čísla jsou stejná jako realita výš, uprav podle domluvy se zákazníkem.";
+        : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.";
       return '<div class="task-card" style="flex-direction:column;align-items:stretch;">'+
         '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span><span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
         renderFotkyLinks(t.fotky)+'</div>'+
         '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ (realita)</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
         (v.poznamka ? '<div class="hint" style="margin-top:6px;"><b>Poznámka (interní):</b> '+escapeHtml(v.poznamka)+'</div>' : '')+
         '<div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'+
-          '<h3 style="font-family:var(--font-display);font-size:15px;margin:0 0 3px;">Verze pro zákazníka</h3>'+
+          '<h3 style="font-family:var(--font-display);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.02em;margin:0 0 3px;">Verze pro zákazníka</h3>'+
           '<p class="hint" style="margin:0 0 8px;">'+escapeHtml(savedNote)+'</p>'+
-          '<div class="table-scroll"><table class="rows"><thead><tr><th>Typ palety</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+zakRowsHtml+'</tbody></table></div>'+
+          '<div class="table-scroll"><table class="rows">'+
+            '<thead><tr><th>Typ palety</th><th>Stav</th><th>Ks</th><th>Cena/ks</th><th>Celkem</th><th></th></tr></thead>'+
+            '<tbody>'+zakRowsHtml+'</tbody>'+
+            '<tfoot><tr><td colspan="2">Celkem</td><td id="zak-totks-'+tpId+'">'+zakTotalKs+' ks</td><td></td><td id="zak-totcena-'+tpId+'">'+fmtKc(zakTotalCena)+'</td><td></td></tr></tfoot>'+
+          '</table></div>'+
+          '<button type="button" class="btn ghost small" data-add-zak="'+tpId+'" style="margin-top:8px;">+ Přidat řádek</button>'+
           '<div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;">'+
             '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'">Uložit a vygenerovat PDF pro zákazníka</button>'+
             '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
@@ -792,12 +842,52 @@
         '</div>';
     }).join("");
 
-    wrap.querySelectorAll("input[data-tp]").forEach(function(inp){
-      inp.addEventListener("input", function(){
-        var tid = inp.getAttribute("data-tp");
-        var idx = Number(inp.getAttribute("data-idx"));
-        var field = inp.getAttribute("data-field");
-        zakRowsByTask[tid][idx][field] = Number(inp.value) || 0;
+    function recalcZakTotals(tpId){
+      var rows = zakRowsByTask[tpId] || [];
+      var totKs = 0, totCena = 0;
+      rows.forEach(function(r, idx){
+        var sub = (Number(r.mnozstvi)||0) * (Number(r.cena)||0);
+        totKs += Number(r.mnozstvi)||0;
+        totCena += sub;
+        var subEl = document.getElementById("zak-sub-"+tpId+"-"+idx);
+        if (subEl) subEl.textContent = fmtKc(sub);
+      });
+      var ksEl = document.getElementById("zak-totks-"+tpId);
+      if (ksEl) ksEl.textContent = totKs + " ks";
+      var cenaEl = document.getElementById("zak-totcena-"+tpId);
+      if (cenaEl) cenaEl.textContent = fmtKc(totCena);
+    }
+
+    function onZakFieldChange(el){
+      var tid = el.getAttribute("data-tp");
+      var idx = Number(el.getAttribute("data-idx"));
+      var field = el.getAttribute("data-field");
+      var row = zakRowsByTask[tid] && zakRowsByTask[tid][idx];
+      if (!row) return;
+      if (field === "typ") row.typ = el.value;
+      else if (field === "stav") row.stav = el.value;
+      else row[field] = Number(el.value) || 0;
+      recalcZakTotals(tid);
+    }
+    wrap.querySelectorAll('input[data-tp][data-field]').forEach(function(inp){
+      inp.addEventListener("input", function(){ onZakFieldChange(inp); });
+    });
+    wrap.querySelectorAll('select[data-tp][data-field]').forEach(function(sel){
+      sel.addEventListener("change", function(){ onZakFieldChange(sel); });
+    });
+    wrap.querySelectorAll("[data-del-zak]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var tid = btn.getAttribute("data-del-zak");
+        var idx = Number(btn.getAttribute("data-idx"));
+        zakRowsByTask[tid].splice(idx, 1);
+        renderPrehled();
+      });
+    });
+    wrap.querySelectorAll("[data-add-zak]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var tid = btn.getAttribute("data-add-zak");
+        zakRowsByTask[tid].push({ id:uid(), typ:"", stav:"dobre", mnozstvi:0, cena:0 });
+        renderPrehled();
       });
     });
     wrap.querySelectorAll("[data-pdf-tp]").forEach(function(btn){
@@ -809,7 +899,9 @@
     var task = tasks.filter(function(t){ return t._tpId === tpId; })[0];
     var msgEl = document.getElementById("pdf-msg-" + tpId);
     if (!task){ return; }
-    var radky = (zakRowsByTask[tpId]||[]).map(function(r){ return { typ:r.typ, dobre:r.dobre||0, poskozene:r.poskozene||0 }; });
+    var radky = (zakRowsByTask[tpId]||[]).filter(function(r){ return r.typ; }).map(function(r){
+      return { typ:r.typ, stav:(r.stav==="poskozene"?"poskozene":"dobre"), mnozstvi:Number(r.mnozstvi)||0, cena:Number(r.cena)||0 };
+    });
     var zakaznickaVerze = { radky: radky, ulozeno: new Date().toISOString(), upravil: currentZapisovatel };
     db.collection("tridici_protokoly").doc(tpId).update({ zakaznicka_verze: zakaznickaVerze }).then(function(){
       if (msgEl){ msgEl.textContent = "Uloženo ✓"; msgEl.className = "form-msg ok"; }
@@ -822,39 +914,43 @@
 
   // Otevře čistou tiskovou stránku v novém okně (žádná appka kolem, jen protokol) —
   // "Vytisknout / Uložit jako PDF" pak dá reálný PDF soubor k odeslání zákazníkovi.
-  // První verze vzhledu — čeká na schválení Lukášem (viz footer appky).
+  // Ceny jsou ty, za které zákazníkovi fakturujeme — ne výkupní ceník appky Výkup.
+  // Každá položka (typ + stav dobré/poškozené) má vlastní řádek s cenou za kus a
+  // mezisoučtem; dole je součet všech kusů a celkové ceny.
   function buildZakaznickyPdfHtml(firma, datumIso, radky){
     var rowsHtml = radky.map(function(r){
-      return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(r.dobre||0)+'</td><td>'+(r.poskozene||0)+'</td></tr>';
+      var mnozstvi = Number(r.mnozstvi)||0, cena = Number(r.cena)||0, sub = mnozstvi*cena;
+      return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(STAV_LABELS[r.stav]||"—")+'</td><td>'+mnozstvi+' ks</td><td>'+fmtKc(cena)+'</td><td>'+fmtKc(sub)+'</td></tr>';
     }).join("");
-    var totalDobre = radky.reduce(function(s,r){ return s + (Number(r.dobre)||0); }, 0);
-    var totalPosk = radky.reduce(function(s,r){ return s + (Number(r.poskozene)||0); }, 0);
+    var totalKs = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
+    var totalCena = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
     var vystaveno = new Date().toLocaleString("cs-CZ");
     return '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">'+
       '<title>Třídicí protokol – '+escapeHtml(firma)+'</title>'+
       '<style>'+
-      'body{font-family:Georgia,"Times New Roman",serif;color:#1B2422;max-width:680px;margin:40px auto;padding:0 24px;}'+
-      '.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1B2422;padding-bottom:12px;margin-bottom:24px;gap:16px;flex-wrap:wrap;}'+
+      'body{font-family:Georgia,"Times New Roman",serif;color:#111;max-width:720px;margin:40px auto;padding:0 24px;}'+
+      '.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:24px;gap:16px;flex-wrap:wrap;}'+
       '.co{font-family:Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:.03em;}'+
       '.co small{display:block;font-weight:500;font-size:11px;letter-spacing:.08em;color:#666;text-transform:uppercase;margin-top:2px;}'+
       'h1{font-size:22px;margin:0 0 4px;}'+
       '.meta{font-family:Arial,sans-serif;font-size:14px;margin-bottom:20px;color:#333;}'+
       '.meta b{color:#000;}'+
-      'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;margin-top:8px;}'+
-      'th,td{border:1px solid #ccc;padding:8px 10px;text-align:left;}'+
-      'th{background:#f3f3f3;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}'+
+      'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13.5px;margin-top:8px;}'+
+      'th,td{border:1px solid #ddd;padding:9px 11px;text-align:left;}'+
+      'th{background:#f2f2f2;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#555;}'+
       'td:not(:first-child),th:not(:first-child){text-align:right;}'+
-      'tfoot td{font-weight:700;border-top:2px solid #1B2422;}'+
+      'tbody tr:nth-child(even){background:#fafafa;}'+
+      'tfoot td{font-weight:800;border-top:2px solid #111;background:#fff;font-size:14px;}'+
       '.foot{margin-top:36px;font-family:Arial,sans-serif;font-size:11px;color:#888;display:flex;justify-content:space-between;}'+
-      '.print-btn{font-family:Arial,sans-serif;margin-bottom:24px;padding:10px 18px;font-size:14px;font-weight:700;border-radius:8px;border:none;background:#BE5322;color:#fff;cursor:pointer;}'+
+      '.print-btn{font-family:Arial,sans-serif;margin-bottom:24px;padding:10px 18px;font-size:14px;font-weight:700;border-radius:8px;border:none;background:#111;color:#fff;cursor:pointer;}'+
       '@media print{.print-btn{display:none;}}'+
       '</style></head><body>'+
       '<button class="print-btn" onclick="window.print()">Vytisknout / Uložit jako PDF</button>'+
       '<div class="hdr"><div class="co">PALETY VÍT<small>Třídění a zpracování palet</small></div><h1>Třídicí protokol</h1></div>'+
       '<div class="meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
-      '<table><thead><tr><th>Typ palety</th><th>Dobré (ks)</th><th>Poškozené (ks)</th></tr></thead>'+
+      '<table><thead><tr><th>Typ palety</th><th>Stav</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>'+
       '<tbody>'+rowsHtml+'</tbody>'+
-      '<tfoot><tr><td>Celkem</td><td>'+totalDobre+'</td><td>'+totalPosk+'</td></tr></tfoot>'+
+      '<tfoot><tr><td colspan="2">Celkem</td><td>'+totalKs+' ks</td><td></td><td>'+fmtKc(totalCena)+'</td></tr></tfoot>'+
       '</table>'+
       '<div class="foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>'+
       '</body></html>';
