@@ -137,8 +137,6 @@
 
   .identity-bar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 16px; box-shadow:var(--shadow-sm); }
   .identity-bar .lbl{ font-size:13px; font-weight:600; color:var(--ink-soft); white-space:nowrap; }
-  .identity-chip{ padding:8px 14px; border-radius:999px; border:1.5px solid var(--border-strong); background:var(--surface-2); font-size:13.5px; font-weight:700; cursor:pointer; }
-  .identity-chip[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
 
   .zam-row{ display:grid; grid-template-columns:1fr 100px auto; gap:10px; align-items:center; margin-bottom:8px; }
   @media (max-width:520px){ .zam-row{ grid-template-columns:1fr 90px auto; } }
@@ -157,12 +155,40 @@
 
   footer.doc-footer{ font-size:12.5px; color:var(--ink-faint); border-top:1px solid var(--border); padding-top:16px; line-height:1.6; }
   footer.doc-footer b{ color:var(--ink-soft); }
+
+  /* login */
+  .login-ov{ position:fixed; inset:0; background:var(--bg); z-index:400; display:none; align-items:center; justify-content:center; padding:20px; }
+  .login-ov.open{ display:flex; }
+  .login-box{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow-md); width:100%; max-width:340px; padding:28px 24px; }
+  .login-logo{ font-family:var(--font-display); font-weight:800; font-size:20px; letter-spacing:-.01em; text-align:center; margin-bottom:2px; }
+  .login-sub{ font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); text-align:center; margin-bottom:22px; }
+  .login-box .field{ margin-bottom:12px; }
+  .login-err{ color:var(--damaged); font-size:13px; margin:-2px 0 12px; display:none; }
+  .login-box .btn.primary{ width:100%; margin-top:6px; }
+
+  /* who-chip (přihlášený uživatel) */
+  .who-chip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 14px; font-size:13.5px; font-weight:600; cursor:pointer; color:var(--ink); }
+  .who-chip .ico{ color:var(--ink-faint); font-size:14px; }
+  .who-chip:hover{ border-color:var(--accent); }
+
   [hidden]{ display:none !important; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div class="login-ov open" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Třídicí protokol</div>
+    <div class="login-sub">Palety Vít</div>
+    <div class="field"><label for="login-email">E-mail</label><input type="email" id="login-email" autocomplete="username"></div>
+    <div class="field"><label for="login-pass">Heslo</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+    <div class="login-err" id="login-err"></div>
+    <button class="btn primary" id="btn-login">Přihlásit se</button>
+  </div>
+</div>
+
+<div class="wrap" id="app-root" style="display:none">
 
   <div class="app-header">
     <div class="brand">
@@ -179,12 +205,12 @@
 
   <div class="identity-bar">
     <span class="lbl">Kdo právě zapisuje:</span>
-    <div class="chip-grid" id="zapisovatel-chips"></div>
+    <div class="who-chip" id="who-chip" title="Odhlásit se"><span id="who-name">—</span><span class="ico">⏻</span></div>
   </div>
 
   <div class="version-note">
     <span class="dot"></span>
-    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). <b>Appka teď opravdu čte data appky Dashboard živě</b> (stejný Firebase projekt) — jakmile se tam vykládka označí „Očekává se třídění" (nebo má reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"), a jakmile se tady uloží výsledek třídění, vykládka v Dashboardu zmizí z fronty čekajících. Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
+    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). Kdo zapisuje se pozná automaticky podle přihlášení (klikni na jméno vpravo nahoře pro odhlášení). <b>Appka teď opravdu čte data appky Dashboard živě</b> (stejný Firebase projekt) — jakmile se tam vykládka označí „Očekává se třídění" (nebo má reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"), a jakmile se tady uloží výsledek třídění, vykládka v Dashboardu zmizí z fronty čekajících. Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
   </div>
 
   <section id="panel-ukoly" role="tabpanel">
@@ -292,6 +318,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -309,6 +336,15 @@
   };
   firebase.initializeApp(firebaseConfig);
   var db = firebase.firestore();
+  var auth = firebase.auth();
+
+  // Kdo se smí přihlásit a jak se jeho e-mail mapuje na "zapisovatele" (viz ZAPISOVATELE
+  // níž) — stejný vzor jako appka Pokladna (Firebase Auth e-mail/heslo, mapování na jméno).
+  var EMAIL_TO_ZAPISOVATEL = {
+    "ondrej.vit@paletyvit.cz": "ondrej",
+    "lukas.vit@v-pallets.cz": "lukas",
+    "bortlikmartin2@seznam.cz": "martin_b"
+  };
 
   var WORKERS = [
     { id:"radek",   name:"Radek",   color:"#2C6B6E" },
@@ -329,7 +365,7 @@
     // automaticky (vykládka s určením "Třídění"). Proto se nezobrazuje v přepínači níž.
     { id:"dashboard", name:"Dashboard", color:"#8A8A8A" }
   ];
-  var currentZapisovatel = ZAPISOVATELE[0].id;
+  var currentZapisovatel = null; // nastaví se podle přihlášeného e-mailu, viz onAuthStateChanged
 
   function byId(list,id){ for (var i=0;i<list.length;i++){ if (list[i].id===id) return list[i]; } return null; }
   function zapisovatelName(id){ var z = ZAPISOVATELE_LOOKUP(id); return z ? z.name : "—"; }
@@ -470,17 +506,11 @@
   }
 
   // ---------------- identity bar ----------------
-  function renderZapisovatelChips(){
-    var wrap = document.getElementById("zapisovatel-chips");
-    wrap.innerHTML = "";
-    ZAPISOVATELE.filter(function(z){ return z.id !== "dashboard"; }).forEach(function(z){
-      var chip = document.createElement("button");
-      chip.type = "button"; chip.className = "identity-chip";
-      chip.setAttribute("aria-pressed", currentZapisovatel === z.id ? "true" : "false");
-      chip.textContent = z.name;
-      chip.addEventListener("click", function(){ currentZapisovatel = z.id; renderZapisovatelChips(); });
-      wrap.appendChild(chip);
-    });
+  // Kdo zapisuje se pozná automaticky podle přihlášení (viz EMAIL_TO_ZAPISOVATEL +
+  // onAuthStateChanged) — appku zapisují jen 3 lidi, ruční přepínání už není potřeba.
+  function renderWhoChip(){
+    var nameEl = document.getElementById("who-name");
+    if (nameEl) nameEl.textContent = zapisovatelName(currentZapisovatel);
   }
 
   // ---------------- ukoly tab ----------------
@@ -810,12 +840,56 @@
   document.getElementById("btn-nu-save").addEventListener("click", saveNewTask);
   document.getElementById("btn-save-result").addEventListener("click", saveResult);
 
-  renderZapisovatelChips();
   renderUrceniChips();
   loadSelectedTaskIntoForm();
   renderUkolyList();
   renderTaskPicker();
-  initFirestore();
+
+  // ---------------- přihlášení ----------------
+  // Stejný vzor jako appka Pokladna: Firebase Auth e-mail/heslo, "kdo zapisuje" se
+  // pozná automaticky podle EMAIL_TO_ZAPISOVATEL, žádné ruční přepínání.
+  var firestoreStarted = false;
+
+  function submitLogin(){
+    var email = document.getElementById("login-email").value.trim();
+    var pass = document.getElementById("login-pass").value;
+    var err = document.getElementById("login-err");
+    err.style.display = "none";
+    if (!email || !pass) return;
+    auth.signInWithEmailAndPassword(email, pass).catch(function(e){
+      err.textContent = "Přihlášení se nepovedlo. Zkontroluj e-mail a heslo.";
+      err.style.display = "block";
+      console.error("login failed", e);
+    });
+  }
+  document.getElementById("btn-login").addEventListener("click", submitLogin);
+  document.getElementById("login-pass").addEventListener("keydown", function(e){ if (e.key === "Enter") submitLogin(); });
+
+  document.getElementById("who-chip").addEventListener("click", function(){
+    if (confirm("Odhlásit se z appky?")) auth.signOut();
+  });
+
+  auth.onAuthStateChanged(function(user){
+    var loginScreen = document.getElementById("login-screen");
+    var appRoot = document.getElementById("app-root");
+    if (user && EMAIL_TO_ZAPISOVATEL[user.email]){
+      currentZapisovatel = EMAIL_TO_ZAPISOVATEL[user.email];
+      loginScreen.classList.remove("open");
+      appRoot.style.display = "";
+      renderWhoChip();
+      if (!firestoreStarted){ firestoreStarted = true; initFirestore(); }
+    } else if (user){
+      // Přihlášený e-mail appka nezná (není ve zmíněné trojici) — nepovolený účet.
+      var err = document.getElementById("login-err");
+      err.textContent = "Tenhle účet appka nezná pro Třídicí protokol. Ozvi se Lukášovi.";
+      err.style.display = "block";
+      auth.signOut();
+    } else {
+      currentZapisovatel = null;
+      appRoot.style.display = "none";
+      loginScreen.classList.add("open");
+    }
+  });
 })();
 </script>
 </body>
