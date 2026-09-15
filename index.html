@@ -546,6 +546,20 @@
     if (!hasConfirmed) return null;
     return mats.reduce(function(s,m){ return s + (m.tridirna != null ? (Number(m.tridirna)||0) : 0); }, 0);
   }
+  // Počet kusů podle dodacího listu (material[].dlQty, sečteno přes všechny řádky
+  // materiálu) — na rozdíl od nakladkaPocetPalet výš je tohle dostupné hned při
+  // založení vykládky v Dashboardu, ne až po potvrzení skladníkem na Třídírně (to se
+  // v praxi u vykládek určených k třídění často vůbec nestane — appka Třídicí protokol
+  // sama JE to potvrzení). Používá se jen jako cíl pro kalkulačku kusů níž (renderRowsCalc),
+  // ne pro pocetPaletText/pocet_palet — tam zůstává rozlišení potvrzeno/čeká beze změny.
+  function nakladkaPocetPaletDl(n){
+    var mats = n.material || [];
+    var soucet = mats.reduce(function(s,m){
+      var v = Number(m.dlQty);
+      return s + (m.dlQty !== "" && m.dlQty != null && isFinite(v) ? v : 0);
+    }, 0);
+    return soucet > 0 ? soucet : null;
+  }
   function nakladkaFotky(n){
     var urls = [];
     if (n.dlFoto && n.dlFoto.url) urls.push(n.dlFoto.url);
@@ -576,7 +590,7 @@
       var pracIds = (workplanByVykladka[n.id]||[]).map(workerIdByName).filter(Boolean);
       return {
         _id: "nk:" + n.id, _source: "nakladka", _nakladkaId: n.id, _tpId: tp ? tp._id : null,
-        datum: n.datum, zakaznik: n.partner, pocet_palet: nakladkaPocetPalet(n),
+        datum: n.datum, zakaznik: n.partner, pocet_palet: nakladkaPocetPalet(n), pocet_palet_dl: nakladkaPocetPaletDl(n),
         pracovnik: pracIds, fotky: nakladkaFotky(n),
         stav: (tp && tp.stav === "hotovo") ? "hotovo" : "novy",
         zalozil: "dashboard",
@@ -832,34 +846,40 @@
     });
   });
 
-  // Cílový počet kusů ke kontrole ručního zadávání — bere appka výhradně ze
-  // SKUTEČNĚ potvrzeného počtu vykládky (task.pocet_palet, u úkolů z Dashboardu
-  // je to číslo, které skladník potvrdí na středisku Třídírna; u ručně založených
-  // "Nová vykládka" záznamů je to počet zadaný při založení). Dokud číslo není
-  // potvrzené (pocet_palet === null), appka kalkulačku vůbec nezobrazí — nemá
-  // se s čím porovnávat, viz pocetPaletText výš.
+  // Cílový počet kusů ke kontrole ručního zadávání. Přednost má SKUTEČNĚ potvrzený
+  // počet (task.pocet_palet — u úkolů z Dashboardu číslo, které skladník potvrdí na
+  // středisku Třídírna; u ručně založených "Nová vykládka" záznamů počet zadaný při
+  // založení). V praxi se ale skladníkovo potvrzení u vykládek určených k třídění
+  // často vůbec nestane — appka Třídicí protokol sama JE to potvrzení — takže appka
+  // jako záložní zdroj použije počet podle dodacího listu (task.pocet_palet_dl,
+  // dostupný hned při založení vykládky v Dashboardu). Vrací null jen když appka
+  // nemá vůbec žádné číslo k porovnání.
   function currentPocetPaletCil(){
     var task = selectedTaskId ? tasks.find(function(t){ return t._id === selectedTaskId; }) : null;
-    if (!task || task.pocet_palet == null) return null;
-    return Number(task.pocet_palet) || 0;
+    if (!task) return null;
+    if (task.pocet_palet != null) return { hodnota: Number(task.pocet_palet)||0, zdroj: "potvrzeno" };
+    if (task.pocet_palet_dl != null) return { hodnota: Number(task.pocet_palet_dl)||0, zdroj: "dl" };
+    return null;
   }
 
   // Živý dopočet při ručním zadávání: appka nic sama nedosazuje do řádků, jen
-  // pod tabulkou hlídá součet proti potvrzenému počtu z Dashboardu — funguje
-  // jako kalkulačka, ne jako automatické vyplňování.
+  // pod tabulkou hlídá součet proti cíli z Dashboardu — funguje jako kalkulačka,
+  // ne jako automatické vyplňování. Štítek rozlišuje potvrzený počet od odhadu
+  // podle DL, ať je jasné, o jak spolehlivé číslo jde.
   function renderRowsCalc(){
     var wrap = document.getElementById("rows-calc");
     if (!wrap) return;
     var cil = currentPocetPaletCil();
-    if (cil == null){ wrap.hidden = true; wrap.className = "rows-calc"; wrap.innerHTML = ""; return; }
+    if (!cil){ wrap.hidden = true; wrap.className = "rows-calc"; wrap.innerHTML = ""; return; }
     var zadano = resultRows.reduce(function(s,r){ return s + (Number(r.dobre)||0) + (Number(r.poskozene)||0); }, 0);
-    var zbyva = cil - zadano;
+    var zbyva = cil.hodnota - zadano;
     wrap.hidden = false;
     wrap.className = "rows-calc " + (zbyva === 0 ? "match" : (zbyva < 0 ? "over" : "under"));
     var zbyvaText = zbyva === 0 ? "0 ks — sedí" : (zbyva > 0 ? zbyva + " ks" : "o " + Math.abs(zbyva) + " ks víc, zkontroluj");
+    var cilLabel = cil.zdroj === "dl" ? "Podle DL" : "Podle Dashboardu";
     wrap.innerHTML =
       '<span class="rc-item"><span class="rc-lbl">Zadáno</span><b>'+zadano+' ks</b></span>'+
-      '<span class="rc-item"><span class="rc-lbl">Podle Dashboardu</span><b>'+cil+' ks</b></span>'+
+      '<span class="rc-item"><span class="rc-lbl">'+cilLabel+'</span><b>'+cil.hodnota+' ks</b></span>'+
       '<span class="rc-item rc-zbyva"><span class="rc-lbl">Zbývá</span><b>'+zbyvaText+'</b></span>';
   }
 
