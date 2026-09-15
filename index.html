@@ -134,6 +134,14 @@
   .photo-box .photo-box-remove{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:12px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.04em; flex:none; }
   .photo-box .photo-box-remove:hover{ color:var(--damaged); }
 
+  .rows-calc{ display:flex; flex-wrap:wrap; gap:16px; align-items:baseline; margin-top:10px; padding:10px 14px; border-radius:var(--radius-s); background:var(--surface-2); border:1px solid var(--border); }
+  .rows-calc .rc-item{ display:flex; align-items:baseline; gap:5px; }
+  .rows-calc .rc-item .rc-lbl{ font-family:var(--font-display); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
+  .rows-calc .rc-item b{ font-family:var(--font-display); font-size:15px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .rows-calc.match .rc-zbyva b{ color:var(--good); }
+  .rows-calc.over .rc-zbyva b{ color:var(--damaged); }
+  .rows-calc.under .rc-zbyva b{ color:var(--pending); }
+
   .foto-links{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
   .foto-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft); text-decoration:none; }
   .foto-chip img{ width:16px; height:16px; border-radius:3px; object-fit:cover; }
@@ -281,6 +289,7 @@
             <tbody id="rows-tbody"></tbody>
           </table>
         </div>
+        <div id="rows-calc" class="rows-calc" hidden></div>
         <button class="btn ghost small" id="btn-add-row" style="margin-top:10px;">+ Přidat vlastní typ</button>
         <div class="field" style="margin-top:14px;">
           <label for="r-poznamka">Poznámka</label>
@@ -823,6 +832,37 @@
     });
   });
 
+  // Cílový počet kusů ke kontrole ručního zadávání — bere appka výhradně ze
+  // SKUTEČNĚ potvrzeného počtu vykládky (task.pocet_palet, u úkolů z Dashboardu
+  // je to číslo, které skladník potvrdí na středisku Třídírna; u ručně založených
+  // "Nová vykládka" záznamů je to počet zadaný při založení). Dokud číslo není
+  // potvrzené (pocet_palet === null), appka kalkulačku vůbec nezobrazí — nemá
+  // se s čím porovnávat, viz pocetPaletText výš.
+  function currentPocetPaletCil(){
+    var task = selectedTaskId ? tasks.find(function(t){ return t._id === selectedTaskId; }) : null;
+    if (!task || task.pocet_palet == null) return null;
+    return Number(task.pocet_palet) || 0;
+  }
+
+  // Živý dopočet při ručním zadávání: appka nic sama nedosazuje do řádků, jen
+  // pod tabulkou hlídá součet proti potvrzenému počtu z Dashboardu — funguje
+  // jako kalkulačka, ne jako automatické vyplňování.
+  function renderRowsCalc(){
+    var wrap = document.getElementById("rows-calc");
+    if (!wrap) return;
+    var cil = currentPocetPaletCil();
+    if (cil == null){ wrap.hidden = true; wrap.className = "rows-calc"; wrap.innerHTML = ""; return; }
+    var zadano = resultRows.reduce(function(s,r){ return s + (Number(r.dobre)||0) + (Number(r.poskozene)||0); }, 0);
+    var zbyva = cil - zadano;
+    wrap.hidden = false;
+    wrap.className = "rows-calc " + (zbyva === 0 ? "match" : (zbyva < 0 ? "over" : "under"));
+    var zbyvaText = zbyva === 0 ? "0 ks — sedí" : (zbyva > 0 ? zbyva + " ks" : "o " + Math.abs(zbyva) + " ks víc, zkontroluj");
+    wrap.innerHTML =
+      '<span class="rc-item"><span class="rc-lbl">Zadáno</span><b>'+zadano+' ks</b></span>'+
+      '<span class="rc-item"><span class="rc-lbl">Podle Dashboardu</span><b>'+cil+' ks</b></span>'+
+      '<span class="rc-item rc-zbyva"><span class="rc-lbl">Zbývá</span><b>'+zbyvaText+'</b></span>';
+  }
+
   function renderRowsTable(){
     var tbody = document.getElementById("rows-tbody");
     tbody.innerHTML = "";
@@ -840,6 +880,7 @@
         inp.addEventListener("input", function(){
           var field = inp.getAttribute("data-field");
           row[field] = field === "typ" ? inp.value : (Number(inp.value)||0);
+          if (field !== "typ") renderRowsCalc();
         });
       });
       var delBtn = tr.querySelector(".row-del-btn");
@@ -849,6 +890,7 @@
       });
       tbody.appendChild(tr);
     });
+    renderRowsCalc();
   }
 
   document.getElementById("btn-add-row").addEventListener("click", function(){
