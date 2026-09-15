@@ -124,6 +124,16 @@
   .zam-del{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:13px; padding:6px; }
   .zam-del:hover{ color:var(--damaged); }
 
+  .photo-box{ display:flex; align-items:center; gap:10px; padding:13px 14px; border:1.5px dashed var(--border-strong); border-radius:var(--radius-s); background:var(--surface-2); cursor:pointer; font-family:var(--font-body); font-size:14px; color:var(--ink-soft); }
+  .photo-box:hover{ border-color:var(--ink); color:var(--ink); }
+  .photo-box.done{ border-style:solid; }
+  .photo-box.pending{ cursor:default; }
+  .photo-box img{ width:40px; height:40px; object-fit:cover; border-radius:6px; flex:none; }
+  .photo-box .photo-box-icon{ font-size:18px; flex:none; }
+  .photo-box .photo-box-text{ flex:1; }
+  .photo-box .photo-box-remove{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-size:12px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.04em; flex:none; }
+  .photo-box .photo-box-remove:hover{ color:var(--damaged); }
+
   .foto-links{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
   .foto-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft); text-decoration:none; }
   .foto-chip img{ width:16px; height:16px; border-radius:3px; object-fit:cover; }
@@ -244,7 +254,7 @@
 
       <div class="card">
         <h2>Zadej výsledek třídění</h2>
-        <p class="hint">Ruční zápis podle papírového třídicího protokolu — sken fotky (OCR) zatím není zapojený, doplní se později.</p>
+        <p class="hint">Ruční zápis podle papírového třídicího protokolu — vyfoť ho níž pro zálohu na Disk. Automatické čtení čísel z fotky (OCR) zatím není zapojené, doplní se později.</p>
         <div class="field-row">
           <div class="field"><label for="r-firma">Firma / zákazník</label><input type="text" id="r-firma"></div>
           <div class="field"><label for="r-datum">Datum</label><input type="text" id="r-datum"></div>
@@ -254,6 +264,12 @@
           <p class="hint" style="margin:0 0 8px;">Zapisuje ten, kdo je zvolený nahoře jako „Kdo právě zapisuje" — tady vyplní, kteří zaměstnanci na tom dělali a jak dlouho každý z nich.</p>
           <div id="zam-rows"></div>
           <button type="button" class="btn ghost small" id="btn-add-zam">+ Přidat zaměstnance</button>
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label>Fotka papírového třídáku</label>
+          <p class="hint" style="margin:0 0 8px;">Záloha na stejný Disk a do stejné složky, kterou už appka Dashboard založila pro tuhle vykládku (vedle dodacího listu a dalších fotek).</p>
+          <input type="file" id="r-foto-input" accept="image/*" capture="environment" style="display:none;">
+          <div class="photo-box" id="r-foto-box" tabindex="0"><span class="photo-box-icon">📷</span><span class="photo-box-text">Vyfotit / nahrát třídák</span></div>
         </div>
         <div style="margin-top:16px;" class="table-scroll">
           <table class="rows" id="rows-table">
@@ -356,6 +372,53 @@
   function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
   function uid(){ return "r"+Math.random().toString(36).slice(2,9); }
 
+  // ---------------- fotka papírového třídáku na Google Drive ----------------
+  // Stejný Apps Script Web App a stejný Sdílený disk jako appka Dashboard (viz
+  // claude/foto_uloziste_google_drive_navrh.md) — appka fotku třídáku uloží do STEJNÉ
+  // složky "Firma - datum", kterou už Dashboard založil pro tuhle vykládku (dodací list,
+  // fotky skladu/třídírny), ne do nové oddělené složky. Appka nezná žádný servisní klíč,
+  // jen veřejnou URL nasazeného skriptu — kód (compressImage/upload/smazat/pojmenování)
+  // je záměrně kopie appky Dashboard, aby appky ukládaly úplně stejně.
+  var DRIVE_UPLOAD_URL = "https://script.google.com/macros/s/AKfycbzpLsiFBu1OKJ99UYw4cyjVphgjwXicyKYAAIXW0vl_LF7fTBuNbXSsXMjSZZBvQOzp/exec";
+
+  function sanitizeFileNamePart(s){ return String(s||"").replace(/[\/\\:*?"<>|]/g,"").trim(); }
+  function driveSlozkaNazevZakazka(partner, datum){
+    return (sanitizeFileNamePart(partner) || "(bez názvu)") + " - " + datum;
+  }
+  function compressImage(file, maxDim, quality){
+    maxDim = maxDim || 1000; quality = quality || 0.55;
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = function(e){
+        var img = new Image();
+        img.onerror = reject;
+        img.onload = function(){
+          var w = img.width, h = img.height;
+          if (w > h && w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; }
+          else if (h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; }
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function uploadFotoNaDrive(dataUrl, datum, slozka, typNazev){
+    var filename = datum + "_" + sanitizeFileNamePart(typNazev) + ".jpg";
+    return fetch(DRIVE_UPLOAD_URL, {
+      method: "POST",
+      body: JSON.stringify({ datum: datum, slozka: slozka, typFoto: typNazev, dataUrl: dataUrl, filename: filename })
+    }).then(function(r){ return r.json(); });
+  }
+  function smazatFotoZDrive(driveFileId){
+    if (!driveFileId) return Promise.resolve();
+    return fetch(DRIVE_UPLOAD_URL, { method:"POST", body: JSON.stringify({ akce:"smazat", driveFileId: driveFileId }) }).catch(function(){});
+  }
+
   // Živá data appky Dashboard (jen ke čtení) — zdroj fronty úkolů.
   var nakladky = [];            // kolekce "nakladky" (stejná appka i data jako Dashboard)
   var workplanByVykladka = {};  // vykladkaId -> [jméno pracovníka,...], z kolekce "workplan"
@@ -408,7 +471,9 @@
   // Appka řeší jen třídění (žádné "Oprava" / "Rovnou sklad" určení) — na rozdíl
   // od appky Dashboard, která tyhle jiné určení dovozu taky zná.
   var nuForm = { datum: todayISO(), pracovnik: [] };
-  var rForm = { firma:"", datum: todayISO(), zamestnanci: [] }; // zamestnanci: [{id, pracovnik, hodiny}]
+  var rForm = { firma:"", datum: todayISO(), zamestnanci: [], fotoTridaku: null };
+  // zamestnanci: [{id, pracovnik, hodiny}]
+  // fotoTridaku: null | {dataUrl} (právě se nahrává na Disk) | {driveFileId,url,filename} (hotovo)
 
   function defaultZamRow(pracovnikId){ return { id: uid(), pracovnik: pracovnikId || "", hodiny: 0 }; }
 
@@ -655,22 +720,102 @@
         rForm.zamestnanci = (task.vysledek.zamestnanci||[]).map(function(z){ return { id:uid(), pracovnik:z.pracovnik, hodiny:z.hodiny||0 }; });
         if (rForm.zamestnanci.length === 0) rForm.zamestnanci = [defaultZamRow()];
         document.getElementById("r-poznamka").value = task.vysledek.poznamka || "";
+        rForm.fotoTridaku = task.vysledek.foto_tridaku || null;
       } else {
         resultRows = emptyRows();
         rForm.zamestnanci = (task.pracovnik && task.pracovnik.length) ? task.pracovnik.map(function(id){ return defaultZamRow(id); }) : [defaultZamRow()];
         document.getElementById("r-poznamka").value = "";
+        rForm.fotoTridaku = null;
       }
     } else {
       infoCard.hidden = true;
       rForm.firma = ""; rForm.datum = todayISO(); rForm.zamestnanci = [defaultZamRow()];
       resultRows = emptyRows();
       document.getElementById("r-poznamka").value = "";
+      rForm.fotoTridaku = null;
     }
     document.getElementById("r-firma").value = rForm.firma;
     document.getElementById("r-datum").value = fmtDateCZ(rForm.datum);
     renderZamRows();
     renderRowsTable();
+    renderFotoTridakuBox();
   }
+
+  // Složka/datum pro upload fotky třídáku — appka je bere z PŮVODNÍCH údajů úkolu
+  // (task.zakaznik/task.datum), ne z aktuálně rozeditovaných polí firma/datum ve
+  // formuláři, aby se fotka vždycky trefila do stejné složky, kterou už případně
+  // založil Dashboard — i kdyby si zapisovatel jméno firmy v poli výš opravil/upřesnil.
+  function currentFotoTridakuTask(){
+    return selectedTaskId ? tasks.find(function(t){ return t._id === selectedTaskId; }) : null;
+  }
+  function currentFotoTridakuSlozka(){
+    var task = currentFotoTridakuTask();
+    if (task) return driveSlozkaNazevZakazka(task.zakaznik, task.datum);
+    var firma = document.getElementById("r-firma").value.trim() || rForm.firma;
+    return driveSlozkaNazevZakazka(firma, rForm.datum);
+  }
+  function currentFotoTridakuDatum(){
+    var task = currentFotoTridakuTask();
+    return task ? task.datum : rForm.datum;
+  }
+
+  function renderFotoTridakuBox(){
+    var box = document.getElementById("r-foto-box");
+    if (!box) return;
+    var p = rForm.fotoTridaku;
+    if (!p){
+      box.className = "photo-box";
+      box.innerHTML = '<span class="photo-box-icon">📷</span><span class="photo-box-text">Vyfotit / nahrát třídák</span>';
+    } else if (p.driveFileId){
+      box.className = "photo-box done";
+      box.innerHTML = '<span class="photo-box-icon">📄</span><span class="photo-box-text">'+escapeHtml(p.filename)+' · ✓ na Disku</span><button type="button" class="photo-box-remove" id="r-foto-remove">Odebrat</button>';
+      var rm = document.getElementById("r-foto-remove");
+      if (rm) rm.addEventListener("click", function(ev){ ev.stopPropagation(); removeFotoTridaku(); });
+    } else if (p.dataUrl){
+      box.className = "photo-box pending";
+      box.innerHTML = '<img src="'+p.dataUrl+'"><span class="photo-box-text">⏳ nahrávám na Disk…</span>';
+    }
+  }
+
+  function removeFotoTridaku(){
+    var p = rForm.fotoTridaku;
+    if (p && p.driveFileId) smazatFotoZDrive(p.driveFileId);
+    rForm.fotoTridaku = null;
+    renderFotoTridakuBox();
+  }
+
+  document.getElementById("r-foto-box").addEventListener("click", function(){
+    if (rForm.fotoTridaku && rForm.fotoTridaku.dataUrl && !rForm.fotoTridaku.driveFileId) return; // právě se nahrává
+    document.getElementById("r-foto-input").click();
+  });
+  document.getElementById("r-foto-input").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    var oldPhoto = rForm.fotoTridaku;
+    compressImage(file).then(function(dataUrl){
+      rForm.fotoTridaku = { dataUrl: dataUrl };
+      renderFotoTridakuBox();
+      if (oldPhoto && oldPhoto.driveFileId) smazatFotoZDrive(oldPhoto.driveFileId);
+      var slozka = currentFotoTridakuSlozka();
+      var datum = currentFotoTridakuDatum();
+      uploadFotoNaDrive(dataUrl, datum, slozka, "třídicí protokol").then(function(res){
+        // appka mezitím nepřepnula na jiný úkol / nevybrala jinou fotku
+        if (rForm.fotoTridaku && rForm.fotoTridaku.dataUrl === dataUrl){
+          rForm.fotoTridaku = { driveFileId: res.driveFileId, url: res.url, filename: res.filename };
+          renderFotoTridakuBox();
+        }
+      }).catch(function(err){
+        console.error("upload foto tridaku failed", err);
+        if (rForm.fotoTridaku && rForm.fotoTridaku.dataUrl === dataUrl){
+          rForm.fotoTridaku = null;
+          renderFotoTridakuBox();
+          var msg = document.getElementById("result-msg");
+          if (msg){ msg.textContent = "Nahrání fotky třídáku na Disk se nepovedlo, zkus to znovu."; msg.className = "form-msg err"; }
+        }
+      });
+    });
+  });
 
   function renderRowsTable(){
     var tbody = document.getElementById("rows-tbody");
@@ -737,6 +882,9 @@
     var msg = document.getElementById("result-msg");
     var firma = document.getElementById("r-firma").value.trim();
     if (!firma){ msg.textContent = "Vyplň firmu/zákazníka."; msg.className="form-msg err"; return; }
+    if (rForm.fotoTridaku && rForm.fotoTridaku.dataUrl && !rForm.fotoTridaku.driveFileId){
+      msg.textContent = "Počkej, až se fotka třídáku nahraje na Disk."; msg.className="form-msg err"; return;
+    }
     var radky = resultRows.filter(function(r){ return r.typ && (r.dobre>0 || r.poskozene>0); })
       .map(function(r){ return { typ:r.typ, dobre:r.dobre, poskozene:r.poskozene }; });
     var zamestnanci = rForm.zamestnanci.filter(function(z){ return z.pracovnik; })
@@ -746,6 +894,7 @@
       firma: firma, datum: document.getElementById("r-datum").value,
       zamestnanci: zamestnanci, radky: radky,
       poznamka: document.getElementById("r-poznamka").value.trim(),
+      foto_tridaku: (rForm.fotoTridaku && rForm.fotoTridaku.driveFileId) ? { driveFileId: rForm.fotoTridaku.driveFileId, url: rForm.fotoTridaku.url, filename: rForm.fotoTridaku.filename } : null,
       zapsal: currentZapisovatel,
       ulozeno: new Date().toISOString()
     };
@@ -799,6 +948,7 @@
       }
       var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
       var names = zamList.join(", ") || "—";
+      var fotkyAll = (t.fotky||[]).concat((v.foto_tridaku && v.foto_tridaku.url) ? [v.foto_tridaku.url] : []);
       var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
       var zakRows = zakRowsByTask[tpId];
       var zakTotalKs = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
@@ -822,7 +972,7 @@
         : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.";
       return '<div class="task-card" style="flex-direction:column;align-items:stretch;">'+
         '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span><span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
-        renderFotkyLinks(t.fotky)+'</div>'+
+        renderFotkyLinks(fotkyAll)+'</div>'+
         '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ (realita)</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
         (v.poznamka ? '<div class="hint" style="margin-top:6px;"><b>Poznámka (interní):</b> '+escapeHtml(v.poznamka)+'</div>' : '')+
         '<div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'+
