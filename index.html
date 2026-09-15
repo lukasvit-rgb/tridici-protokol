@@ -153,6 +153,9 @@
   .login-sub{ font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--ink-soft); text-align:center; margin-bottom:22px; }
   .login-box .field{ margin-bottom:12px; }
   .login-err{ color:var(--damaged); font-size:12px; margin:-6px 0 14px; display:none; }
+  .login-err.ok{ color:var(--good); }
+  .login-forgot{ display:block; background:none; border:none; padding:0; margin:-4px 0 14px; font-size:12px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:var(--font-body); text-align:left; }
+  .login-forgot:hover{ color:var(--ink); }
   .login-box .btn.primary{ width:100%; margin-top:6px; }
 
   /* who-chip (přihlášený uživatel) */
@@ -172,6 +175,7 @@
     <div class="login-sub">Palety Vít</div>
     <div class="field"><label for="login-email">E-mail</label><input type="email" id="login-email" autocomplete="username"></div>
     <div class="field"><label for="login-pass">Heslo</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+    <button type="button" class="login-forgot" id="btn-forgot">Zapomenuté heslo?</button>
     <div class="login-err" id="login-err"></div>
     <button class="btn primary" id="btn-login">Přihlásit se</button>
   </div>
@@ -1144,16 +1148,43 @@
     var email = document.getElementById("login-email").value.trim();
     var pass = document.getElementById("login-pass").value;
     var err = document.getElementById("login-err");
+    err.className = "login-err";
     err.style.display = "none";
     if (!email || !pass) return;
     auth.signInWithEmailAndPassword(email, pass).catch(function(e){
       err.textContent = "Přihlášení se nepovedlo. Zkontroluj e-mail a heslo.";
+      err.className = "login-err";
       err.style.display = "block";
       console.error("login failed", e);
     });
   }
   document.getElementById("btn-login").addEventListener("click", submitLogin);
   document.getElementById("login-pass").addEventListener("keydown", function(e){ if (e.key === "Enter") submitLogin(); });
+
+  // Reset hesla — appka nemá vlastní účty, jede na Firebase Auth, takže appka
+  // jen zavolá vestavěný sendPasswordResetEmail; odkaz na nastavení nového hesla
+  // přijde na zadaný e-mail přímo od Firebase/Googlu.
+  function submitForgotPassword(){
+    var email = document.getElementById("login-email").value.trim();
+    var err = document.getElementById("login-err");
+    if (!email){
+      err.textContent = "Napiš nahoře e-mail, na který mám poslat odkaz na reset hesla.";
+      err.className = "login-err";
+      err.style.display = "block";
+      return;
+    }
+    auth.sendPasswordResetEmail(email).then(function(){
+      err.textContent = "Odkaz na nastavení nového hesla byl odeslán na " + email + ".";
+      err.className = "login-err ok";
+      err.style.display = "block";
+    }).catch(function(e){
+      console.error("reset hesla failed", e);
+      err.textContent = "Nepovedlo se odeslat odkaz. Zkontroluj, že je e-mail napsaný správně.";
+      err.className = "login-err";
+      err.style.display = "block";
+    });
+  }
+  document.getElementById("btn-forgot").addEventListener("click", submitForgotPassword);
 
   document.getElementById("who-chip").addEventListener("click", function(){
     if (confirm("Odhlásit se z appky?")) auth.signOut();
