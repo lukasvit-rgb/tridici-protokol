@@ -187,6 +187,25 @@
 
   [hidden]{ display:none !important; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+
+  /* PDF pro zákazníka — dočasný skrytý kontejner, ze kterého html2canvas vykresluje
+     stahovaný soubor (viz stahnoutZakaznickyPdf/buildZakaznickyPdfContentHtml). Umístěný
+     mimo viditelnou plochu posunem, ne přes opacity/visibility — ty by se totiž promítly
+     i do vykresleného PDF (html2canvas zachytí skutečně vypočtený vzhled). */
+  .pdf-export-root{ position:fixed; left:-9999px; top:0; width:720px; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }
+  .pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }
+  .pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }
+  .pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }
+  .pdf-export-root h1{ font-size:22px; margin:0 0 4px; }
+  .pdf-export-root .pdf-meta{ font-family:Arial,sans-serif; font-size:14px; margin-bottom:20px; color:#333; }
+  .pdf-export-root .pdf-meta b{ color:#000; }
+  .pdf-export-root table{ width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:13.5px; margin-top:8px; }
+  .pdf-export-root th, .pdf-export-root td{ border:1px solid #ddd; padding:9px 11px; text-align:left; }
+  .pdf-export-root th{ background:#f2f2f2; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#555; }
+  .pdf-export-root td:not(:first-child), .pdf-export-root th:not(:first-child){ text-align:right; }
+  .pdf-export-root tbody tr:nth-child(even){ background:#fafafa; }
+  .pdf-export-root tfoot td{ font-weight:800; border-top:2px solid #111; background:#fff; font-size:14px; }
+  .pdf-export-root .pdf-foot{ margin-top:36px; font-family:Arial,sans-serif; font-size:11px; color:#888; display:flex; justify-content:space-between; }
 </style>
 </head>
 <body>
@@ -1240,11 +1259,13 @@
     }).catch(function(){ /* chyba už je vypsaná v #pdf-msg-<tpId> */ });
   }
 
-  // Sestaví obsah protokolu pro zákazníka (bez vlastní appky kolem) — používá se jako
-  // podklad pro stahovaný PDF soubor. Ceny jsou ty, za které zákazníkovi fakturujeme —
-  // ne výkupní ceník appky Výkup. Každá položka (typ + stav dobré/poškozené) má vlastní
-  // řádek s cenou za kus a mezisoučtem; dole je součet všech kusů a celkové ceny.
-  function buildZakaznickyPdfHtml(firma, datumIso, radky){
+  // Sestaví obsah protokolu pro zákazníka (bez vlastní appky kolem) — jen vnitřní HTML
+  // (bez doctype/html/head/body), vkládá se do dočasného skrytého kontejneru ve stránce
+  // (viz stahnoutZakaznickyPdf), ne do samostatného dokumentu/iframu — viz vysvětlení tam.
+  // Ceny jsou ty, za které zákazníkovi fakturujeme — ne výkupní ceník appky Výkup. Každá
+  // položka (typ + stav dobré/poškozené) má vlastní řádek s cenou za kus a mezisoučtem;
+  // dole je součet všech kusů a celkové ceny.
+  function buildZakaznickyPdfContentHtml(firma, datumIso, radky){
     var rowsHtml = radky.map(function(r){
       var mnozstvi = Number(r.mnozstvi)||0, cena = Number(r.cena)||0, sub = mnozstvi*cena;
       return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(STAV_LABELS[r.stav]||"—")+'</td><td>'+mnozstvi+' ks</td><td>'+fmtKc(cena)+'</td><td>'+fmtKc(sub)+'</td></tr>';
@@ -1252,79 +1273,60 @@
     var totalKs = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
     var totalCena = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
     var vystaveno = new Date().toLocaleString("cs-CZ");
-    return '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">'+
-      '<title>Třídicí protokol – '+escapeHtml(firma)+'</title>'+
-      '<style>'+
-      'body{font-family:Georgia,"Times New Roman",serif;color:#111;max-width:720px;margin:40px auto;padding:0 24px;}'+
-      '.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #111;padding-bottom:12px;margin-bottom:24px;gap:16px;flex-wrap:wrap;}'+
-      '.co{font-family:Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:.03em;}'+
-      '.co small{display:block;font-weight:500;font-size:11px;letter-spacing:.08em;color:#666;text-transform:uppercase;margin-top:2px;}'+
-      'h1{font-size:22px;margin:0 0 4px;}'+
-      '.meta{font-family:Arial,sans-serif;font-size:14px;margin-bottom:20px;color:#333;}'+
-      '.meta b{color:#000;}'+
-      'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13.5px;margin-top:8px;}'+
-      'th,td{border:1px solid #ddd;padding:9px 11px;text-align:left;}'+
-      'th{background:#f2f2f2;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#555;}'+
-      'td:not(:first-child),th:not(:first-child){text-align:right;}'+
-      'tbody tr:nth-child(even){background:#fafafa;}'+
-      'tfoot td{font-weight:800;border-top:2px solid #111;background:#fff;font-size:14px;}'+
-      '.foot{margin-top:36px;font-family:Arial,sans-serif;font-size:11px;color:#888;display:flex;justify-content:space-between;}'+
-      '</style></head><body>'+
-      '<div class="hdr"><div class="co">PALETY VÍT<small>Třídění a zpracování palet</small></div><h1>Třídicí protokol</h1></div>'+
-      '<div class="meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
+    return '<div class="pdf-hdr"><div class="pdf-co">PALETY VÍT<small>Třídění a zpracování palet</small></div><h1>Třídicí protokol</h1></div>'+
+      '<div class="pdf-meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
       '<table><thead><tr><th>Typ palety</th><th>Stav</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>'+
       '<tbody>'+rowsHtml+'</tbody>'+
       '<tfoot><tr><td colspan="2">Celkem</td><td>'+totalKs+' ks</td><td></td><td>'+fmtKc(totalCena)+'</td></tr></tfoot>'+
       '</table>'+
-      '<div class="foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>'+
-      '</body></html>';
+      '<div class="pdf-foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>';
   }
 
-  // Vyrenderuje protokol v neviditelném iframu (stejné HTML/CSS jako dřív šlo do tiskového
-  // okna) a přes html2pdf.js (html2canvas + jsPDF pod kapotou, načtené z CDN) ho rovnou
-  // převede na skutečný PDF soubor a stáhne — bez tiskového dialogu, přímo do Stažených
-  // souborů prohlížeče. Renderování přes iframe+html2canvas (místo ručního skládání PDF
-  // přes jsPDF text API) je schválně — jsPDF standardní fonty neumí česká interpunkční
-  // znaménka (č/ř/š/ž/ě/ů), kdežto html2canvas vykreslí stránku stejně, jak by ji ukázal
-  // prohlížeč (systémovým fontem s plnou diakritikou), takže vzhled i text zůstávají 1:1
-  // stejné jako dřívější tiskový náhled.
+  // Vyrenderuje protokol do dočasného skrytého kontejneru přímo v hlavní stránce appky
+  // (ne do samostatného iframu/dokumentu — html2canvas potřebuje počítat rozměry a styly
+  // vůči hlavnímu oknu appky; když jsme dřív renderovali obsah v odděleném iframu s vlastním
+  // dokumentem, html2canvas z něj neuměl spolehlivě vykreslit obsah a stažené PDF vyšlo
+  // prázdné). Přes html2pdf.js (html2canvas + jsPDF pod kapotou, načtené z CDN) obsah
+  // převede na skutečný PDF soubor a rovnou ho stáhne — bez tiskového dialogu, přímo do
+  // Stažených souborů prohlížeče. Vykreslení přes html2canvas (místo ručního skládání PDF
+  // přes jsPDF text API) je schválně — jsPDF standardní fonty neumí českou diakritiku
+  // (č/ř/š/ž/ě/ů), kdežto html2canvas vykreslí obsah stejně, jak by ho ukázal prohlížeč
+  // (systémovým fontem s plnou diakritikou).
   function stahnoutZakaznickyPdf(firma, datumIso, radky, tpId){
     function msgEl(){ return document.getElementById("pdf-msg-" + tpId); }
-    var html = buildZakaznickyPdfHtml(firma, datumIso, radky);
-    var iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.left = "-10000px";
-    iframe.style.top = "0";
-    iframe.style.width = "800px";
-    iframe.style.height = "1200px";
-    iframe.style.border = "none";
-    document.body.appendChild(iframe);
-    function cleanup(){ if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }
-    iframe.onload = function(){
-      var filename = "Tridici-protokol_" + sanitizeFileNamePart(firma) + "_" + datumIso + ".pdf";
-      if (typeof html2pdf !== "function"){
-        cleanup();
-        var m = msgEl();
-        if (m){ m.textContent = "Uloženo ✓, ale knihovna pro PDF se nenačetla — zkontroluj připojení a zkus to znovu."; m.className = "form-msg err"; }
-        return;
-      }
-      html2pdf().set({
-        margin: 24,
-        filename: filename,
-        html2canvas: { scale: 2, backgroundColor: "#ffffff" },
-        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
-      }).from(iframe.contentDocument.body).save().then(function(){
-        cleanup();
-        var m = msgEl();
-        if (m){ m.textContent = "Uloženo ✓ · PDF staženo do Stažených souborů"; m.className = "form-msg ok"; }
-      }).catch(function(e){
-        console.error(e);
-        cleanup();
-        var m = msgEl();
-        if (m){ m.textContent = "Uloženo ✓, ale PDF se nepodařilo vygenerovat: " + (e && e.message ? e.message : "neznámá chyba") + "."; m.className = "form-msg err"; }
+    if (typeof html2pdf !== "function"){
+      var m0 = msgEl();
+      if (m0){ m0.textContent = "Uloženo ✓, ale knihovna pro PDF se nenačetla — zkontroluj připojení a zkus to znovu."; m0.className = "form-msg err"; }
+      return;
+    }
+    var wrap = document.createElement("div");
+    wrap.className = "pdf-export-root";
+    wrap.innerHTML = buildZakaznickyPdfContentHtml(firma, datumIso, radky);
+    document.body.appendChild(wrap);
+    function cleanup(){ if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+    var filename = "Tridici-protokol_" + sanitizeFileNamePart(firma) + "_" + datumIso + ".pdf";
+    // Dva requestAnimationFrame místo jednoho — první jen naplánuje layout, skutečně
+    // vykreslený (napaintovaný) je kontejner až ve druhém; bez téhle rezervy html2canvas
+    // občas zachytí kontejner dřív, než ho prohlížeč stihne vykreslit, a PDF vyjde prázdné.
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        html2pdf().set({
+          margin: 24,
+          filename: filename,
+          html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
+        }).from(wrap).save().then(function(){
+          cleanup();
+          var m = msgEl();
+          if (m){ m.textContent = "Uloženo ✓ · PDF staženo do Stažených souborů"; m.className = "form-msg ok"; }
+        }).catch(function(e){
+          console.error(e);
+          cleanup();
+          var m = msgEl();
+          if (m){ m.textContent = "Uloženo ✓, ale PDF se nepodařilo vygenerovat: " + (e && e.message ? e.message : "neznámá chyba") + "."; m.className = "form-msg err"; }
+        });
       });
-    };
-    iframe.srcdoc = html;
+    });
   }
 
   // ---------------- tabs ----------------
