@@ -1356,10 +1356,29 @@
             filename: filename,
             html2canvas: { scale: 2, backgroundColor: "#ffffff" },
             jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
-          }).from(targetEl).save().then(function(){
+          }).from(targetEl).toPdf().output("blob").then(function(blob){
             cleanup();
+            // Blob vznikl v realmu iframu, ale URL.createObjectURL z hlavního okna appky
+            // na něm funguje bez problémů (ověřeno) — a hlavně: teprve tenhle skutečný,
+            // ručně kliknutý odkaz Chrome nikdy neblokuje. Automatický downlad přes
+            // odkaz.click() appka i tak zkusí jako první (funguje pro drtivou většinu
+            // případů), ale Chrome po pár automatických stažení za sebou (typicky při
+            // testování/opakovaném generování) tichem začne automatická stahování z tyhle
+            // appky blokovat — appka to nijak nepozná (žádná chyba, .click() proběhne),
+            // takže výsledný soubor se nikde neobjeví. Proto appka vždycky ukáže i ruční
+            // odkaz „Stáhnout PDF" jako zálohu, která funguje vždy, i když se automatické
+            // stažení potichu nepovede.
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
             var m = msgEl();
-            if (m){ m.textContent = "Uloženo ✓ · PDF staženo do Stažených souborů"; m.className = "form-msg ok"; }
+            if (m){
+              m.innerHTML = "Uloženo ✓ · PDF vygenerováno — pokud se samo nestáhlo, " +
+                "<a href=\"" + url + "\" download=\"" + escapeHtml(filename) + "\">klikni sem pro stažení</a>.";
+              m.className = "form-msg ok";
+            }
+            setTimeout(function(){ URL.revokeObjectURL(url); }, 10 * 60 * 1000);
           }).catch(function(e){
             console.error(e);
             fail(e && e.message ? e.message : "neznámá chyba");
