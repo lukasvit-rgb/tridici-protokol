@@ -1291,9 +1291,16 @@
 
   // CSS pro export do PDF — vkládá se přímo do izolovaného iframu (viz stahnoutZakaznickyPdf),
   // ne do hlavního stylesheetu appky.
+  // Šířka .pdf-export-root (660px, box-sizing:border-box) je záměrně užší než stránka A4:
+  // html2pdf/jsPDF s "format:a4" a "margin:24" (pt) nedělá žádné škálování obsahu na šířku
+  // stránky — pokud je vykreslený obsah širší než šířka A4 minus okraje (cca 730px při
+  // běžném převodu 1px=0.75pt), pravý okraj se prostě neviditelně OŘÍZNE (žádná chyba,
+  // appka to nepozná). Přesně tohle se stalo s původní šířkou 720px+2×24px padding=768px
+  // (ověřeno přímo na stažených PDF — sloupce "Cena/ks" a "Celkem" i část hlavičky byly
+  // useknuté). 660px s paddingem uvnitř (border-box) dává bezpečnou rezervu.
   var PDF_EXPORT_CSS =
     'body{margin:0;}' +
-    '.pdf-export-root{ width:720px; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }' +
+    '.pdf-export-root{ width:660px; box-sizing:border-box; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }' +
     '.pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }' +
     '.pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }' +
     '.pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }' +
@@ -1340,8 +1347,8 @@
     iframe.style.position = "fixed";
     iframe.style.left = "-99999px";
     iframe.style.top = "0";
-    iframe.style.width = "800px";
-    iframe.style.height = "600px";
+    iframe.style.width = "900px";
+    iframe.style.height = "900px";
     iframe.style.border = "none";
     document.body.appendChild(iframe);
 
