@@ -1185,19 +1185,33 @@
   }
 
   function saveAndGeneratePdf(tpId){
+    // Pozor: db.collection(...).update() u Firestore spouští onSnapshot appky s lokálně
+    // zapsanými daty prakticky okamžitě — dřív, než se vyřeší tenhle .then() (ten čeká na
+    // potvrzení serverem). To znovu vykreslí #prehled-detail (renderPrehledDetail), takže
+    // element zprávy (#pdf-msg-<tpId>) zachycený PŘED voláním by byl v tu chvíli už
+    // odpojený z DOMu — nastavení textu na něj by uživatel nikdy neviděl, ani při úspěchu,
+    // ani při chybě. Element zprávy i tlačítko proto hledáme až uvnitř then/catch, ne předem.
+    function msgEl(){ return document.getElementById("pdf-msg-" + tpId); }
     var task = tasks.filter(function(t){ return t._tpId === tpId; })[0];
-    var msgEl = document.getElementById("pdf-msg-" + tpId);
-    if (!task){ return; }
+    if (!task){
+      var m = msgEl();
+      if (m){ m.textContent = "Úkol se nepodařilo najít, zkus to prosím znovu."; m.className = "form-msg err"; }
+      return;
+    }
     var radky = (zakRowsByTask[tpId]||[]).filter(function(r){ return r.typ; }).map(function(r){
       return { typ:r.typ, stav:(r.stav==="poskozene"?"poskozene":"dobre"), mnozstvi:Number(r.mnozstvi)||0, cena:Number(r.cena)||0 };
     });
     var zakaznickaVerze = { radky: radky, ulozeno: new Date().toISOString(), upravil: currentZapisovatel };
+    var m0 = msgEl();
+    if (m0){ m0.textContent = "Ukládám…"; m0.className = "form-msg"; }
     db.collection("tridici_protokoly").doc(tpId).update({ zakaznicka_verze: zakaznickaVerze }).then(function(){
-      if (msgEl){ msgEl.textContent = "Uloženo ✓"; msgEl.className = "form-msg ok"; }
+      var m = msgEl();
+      if (m){ m.textContent = "Uloženo ✓"; m.className = "form-msg ok"; }
       openZakaznickyPdf(task.vysledek.firma, task.vysledek.datum, radky);
     }).catch(function(e){
       console.error(e);
-      if (msgEl){ msgEl.textContent = "Nepovedlo se uložit."; msgEl.className = "form-msg err"; }
+      var m = msgEl();
+      if (m){ m.textContent = "Nepovedlo se uložit: " + (e && e.message ? e.message : "neznámá chyba") + "."; m.className = "form-msg err"; }
     });
   }
 
