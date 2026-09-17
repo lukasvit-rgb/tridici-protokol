@@ -1260,7 +1260,9 @@
     var totalKs = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
     var totalCena = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
     var vystaveno = new Date().toLocaleString("cs-CZ");
-    return '<div class="pdf-hdr"><div class="pdf-co">PALETY VÍT<small>Třídění a zpracování palet</small></div><h1>Třídicí protokol</h1></div>'+
+    return '<div class="pdf-hdr"><div class="pdf-co">PALETY VÍT s.r.o.<small>Třídění a zpracování palet</small>'+
+      '<div class="pdf-co-details">Lomnička 187, 666 01 Tišnov<br>IČO: 17811422 &nbsp;·&nbsp; DIČ: CZ17811422<br>+420 730 154 501 &nbsp;·&nbsp; info@paletyvit.cz</div>'+
+      '</div><h1>Třídicí protokol</h1></div>'+
       '<div class="pdf-meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
       '<table><thead><tr><th>Typ palety</th><th>Stav</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>'+
       '<tbody>'+rowsHtml+'</tbody>'+
@@ -1277,6 +1279,7 @@
     '.pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }' +
     '.pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }' +
     '.pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }' +
+    '.pdf-export-root .pdf-co-details{ font-family:Arial,sans-serif; font-weight:400; font-size:10.5px; letter-spacing:normal; text-transform:none; color:#666; margin-top:6px; line-height:1.5; }' +
     '.pdf-export-root h1{ font-size:22px; margin:0 0 4px; }' +
     '.pdf-export-root .pdf-meta{ font-family:Arial,sans-serif; font-size:14px; margin-bottom:20px; color:#333; }' +
     '.pdf-export-root .pdf-meta b{ color:#000; }' +
