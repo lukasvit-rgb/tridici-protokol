@@ -98,6 +98,20 @@
   .empty-state h3{ font-family:var(--font-display); font-weight:800; font-size:15px; margin:0 0 4px; color:var(--ink); text-transform:uppercase; }
   .empty-state p{ margin:0; font-size:13px; max-width:380px; margin-inline:auto; }
 
+  /* prehled — kompaktní seznam + detail po rozkliku */
+  .prehled-row{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; justify-content:space-between; cursor:pointer; transition:background .12s, border-color .12s; }
+  .prehled-row:hover, .prehled-row:focus-visible{ background:var(--surface-3); border-color:var(--border-strong); }
+  .prehled-row + .prehled-row{ margin-top:10px; }
+  .prehled-row-stats{ display:flex; gap:16px; align-items:baseline; }
+  .prehled-row-stats .stat{ font-family:var(--font-display); font-weight:800; font-size:14px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .prehled-row-stats .stat.good{ color:var(--good); }
+  .prehled-row-stats .stat.damaged{ color:var(--damaged); }
+  .prehled-row-right{ display:flex; align-items:center; gap:10px; }
+  .prehled-chevron{ color:var(--ink-faint); font-size:20px; font-family:var(--font-display); line-height:1; }
+  .prehled-detail-hdr{ display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .btn-back{ background:none; border:none; padding:0; margin:0 0 14px; font-family:var(--font-display); font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft); cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .btn-back:hover{ color:var(--ink); }
+
   /* zpracovat */
   .task-picker{ display:flex; flex-wrap:wrap; gap:8px; }
   .task-pick-chip{ padding:9px 14px; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface-2); font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
@@ -306,10 +320,14 @@
 
   <section id="panel-prehled" role="tabpanel" hidden>
     <div class="section-stack">
-      <div class="card">
+      <div class="card" id="prehled-list-card">
         <h2>Hotové protokoly</h2>
-        <p class="hint">U každého protokolu je dole „Verze pro zákazníka" — čísla se můžou lišit od reality (různá jednání se zákazníky). Z ní appka vygeneruje PDF k odeslání.</p>
+        <p class="hint">Klikni na protokol pro detail — skutečné kusy podle třídění i verzi pro zákazníka s PDF.</p>
         <div id="prehled-list"></div>
+      </div>
+      <div class="card" id="prehled-detail-card" hidden>
+        <button type="button" class="btn-back" id="btn-prehled-back">← Zpět na seznam</button>
+        <div id="prehled-detail"></div>
       </div>
     </div>
   </section>
@@ -1000,67 +1018,123 @@
   }
 
   // ---------------- prehled tab ----------------
+  // Kompaktní seznam hotových protokolů (nejnovější první) + detail po rozkliku jednoho
+  // řádku — kvůli přehlednosti pro účetní, která odtud přebírá reálný stav třídění.
+  var selectedPrehledId = null;
+
   function renderPrehled(){
-    var wrap = document.getElementById("prehled-list");
+    var listCard = document.getElementById("prehled-list-card");
+    var detailCard = document.getElementById("prehled-detail-card");
+    var listWrap = document.getElementById("prehled-list");
     var done = tasks.filter(function(t){ return t.stav === "hotovo" && t.vysledek; });
+    done.sort(function(a,b){
+      var da = a.vysledek.datum || "", db = b.vysledek.datum || "";
+      return da < db ? 1 : (da > db ? -1 : 0);
+    });
+
+    if (selectedPrehledId && !done.some(function(t){ return t._tpId === selectedPrehledId; })){
+      selectedPrehledId = null;
+    }
+
     if (done.length === 0){
-      wrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s PDF protokolem pro zákazníka.</p></div>';
+      listWrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s PDF protokolem pro zákazníka.</p></div>';
+      listCard.hidden = false;
+      detailCard.hidden = true;
       return;
     }
-    wrap.innerHTML = done.map(function(t){
+
+    listWrap.innerHTML = done.map(function(t){
       var v = t.vysledek;
-      var tpId = t._tpId;
-      if (!zakRowsByTask[tpId]){
-        var savedRadky = (t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length) ? t.zakaznicka_verze.radky : null;
-        zakRowsByTask[tpId] = savedRadky ? normalizeSavedZakRows(savedRadky) : buildDefaultZakRows(v.radky);
-      }
-      var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
-      var names = zamList.join(", ") || "—";
-      var fotkyAll = (t.fotky||[]).concat((v.foto_tridaku && v.foto_tridaku.url) ? [v.foto_tridaku.url] : []);
-      var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
-      var zakRows = zakRowsByTask[tpId];
-      var zakTotalKs = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
-      var zakTotalCena = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
-      var zakRowsHtml = zakRows.map(function(r, idx){
-        var subtotal = (Number(r.mnozstvi)||0) * (Number(r.cena)||0);
-        return '<tr>'+
-          '<td><input type="text" value="'+escapeHtml(r.typ)+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="typ" style="width:130px;"></td>'+
-          '<td><select data-tp="'+tpId+'" data-idx="'+idx+'" data-field="stav">'+
-            '<option value="dobre"'+(r.stav==="dobre"?" selected":"")+'>Dobré</option>'+
-            '<option value="poskozene"'+(r.stav==="poskozene"?" selected":"")+'>Poškozené</option>'+
-          '</select></td>'+
-          '<td><input type="number" min="0" step="1" value="'+r.mnozstvi+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="mnozstvi" style="width:64px;"></td>'+
-          '<td><input type="number" min="0" step="1" value="'+r.cena+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="cena" style="width:76px;"></td>'+
-          '<td id="zak-sub-'+tpId+'-'+idx+'" style="font-family:var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap;">'+fmtKc(subtotal)+'</td>'+
-          '<td><button type="button" class="row-del-btn" data-del-zak="'+tpId+'" data-idx="'+idx+'">Smazat</button></td>'+
-        '</tr>';
-      }).join("");
-      var savedNote = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
-        ? ("Uloženo · naposledy upravil " + zapisovatelName(t.zakaznicka_verze.upravil))
-        : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.";
-      return '<div class="task-card" style="flex-direction:column;align-items:stretch;">'+
-        '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span><span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
-        renderFotkyLinks(fotkyAll)+'</div>'+
-        '<div class="table-scroll" style="margin-top:8px;"><table class="rows"><thead><tr><th>Typ (realita)</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
-        (v.poznamka ? '<div class="hint" style="margin-top:6px;"><b>Poznámka (interní):</b> '+escapeHtml(v.poznamka)+'</div>' : '')+
-        '<div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">'+
-          '<h3 style="font-family:var(--font-display);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.02em;margin:0 0 3px;">Verze pro zákazníka</h3>'+
-          '<p class="hint" style="margin:0 0 8px;">'+escapeHtml(savedNote)+'</p>'+
-          '<div class="table-scroll"><table class="rows">'+
-            '<thead><tr><th>Typ palety</th><th>Stav</th><th>Ks</th><th>Cena/ks</th><th>Celkem</th><th></th></tr></thead>'+
-            '<tbody>'+zakRowsHtml+'</tbody>'+
-            '<tfoot><tr><td colspan="2">Celkem</td><td id="zak-totks-'+tpId+'">'+zakTotalKs+' ks</td><td></td><td id="zak-totcena-'+tpId+'">'+fmtKc(zakTotalCena)+'</td><td></td></tr></tfoot>'+
-          '</table></div>'+
-          '<button type="button" class="btn ghost small" data-add-zak="'+tpId+'" style="margin-top:8px;">+ Přidat řádek</button>'+
-          '<div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;">'+
-            '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'">Uložit a vygenerovat PDF pro zákazníka</button>'+
-            '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
-          '</div>'+
-        '</div>'+
+      var totDobre = (v.radky||[]).reduce(function(s,r){ return s + (Number(r.dobre)||0); }, 0);
+      var totPosk = (v.radky||[]).reduce(function(s,r){ return s + (Number(r.poskozene)||0); }, 0);
+      var zakBadge = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
+        ? '<span class="status-badge hotovo">Pro zákazníka ✓</span>'
+        : '<span class="status-badge novy">Čeká na doplnění</span>';
+      return '<div class="prehled-row" data-open-prehled="'+t._tpId+'" tabindex="0" role="button">'+
+        '<div class="task-main"><span class="zak">'+escapeHtml(v.firma)+'</span>'+
+        '<span class="meta">'+fmtDateCZ(v.datum)+' · zapsal '+zapisovatelName(v.zapsal)+'</span></div>'+
+        '<div class="prehled-row-stats"><span class="stat good">'+totDobre+' ks dobré</span><span class="stat damaged">'+totPosk+' ks poškozené</span></div>'+
+        '<div class="prehled-row-right">'+zakBadge+'<span class="prehled-chevron">›</span></div>'+
         '</div>';
     }).join("");
 
-    function recalcZakTotals(tpId){
+    listWrap.querySelectorAll("[data-open-prehled]").forEach(function(row){
+      row.addEventListener("click", function(){
+        selectedPrehledId = row.getAttribute("data-open-prehled");
+        renderPrehled();
+      });
+      row.addEventListener("keydown", function(e){
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); row.click(); }
+      });
+    });
+
+    if (selectedPrehledId){
+      listCard.hidden = true;
+      detailCard.hidden = false;
+      renderPrehledDetail(selectedPrehledId, done);
+    } else {
+      listCard.hidden = false;
+      detailCard.hidden = true;
+    }
+  }
+
+  function renderPrehledDetail(tpId, doneList){
+    var wrap = document.getElementById("prehled-detail");
+    var t = doneList.filter(function(x){ return x._tpId === tpId; })[0];
+    if (!t){ wrap.innerHTML = ""; return; }
+    var v = t.vysledek;
+    if (!zakRowsByTask[tpId]){
+      var savedRadky = (t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length) ? t.zakaznicka_verze.radky : null;
+      zakRowsByTask[tpId] = savedRadky ? normalizeSavedZakRows(savedRadky) : buildDefaultZakRows(v.radky);
+    }
+    var zamList = (v.zamestnanci||[]).map(function(z){ var w=byId(WORKERS,z.pracovnik); return (w?w.name:z.pracovnik)+" ("+z.hodiny+" h)"; });
+    var names = zamList.join(", ") || "—";
+    var fotkyAll = (t.fotky||[]).concat((v.foto_tridaku && v.foto_tridaku.url) ? [v.foto_tridaku.url] : []);
+    var rowsHtml = (v.radky||[]).map(function(r){ return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+r.dobre+'</td><td>'+r.poskozene+'</td></tr>'; }).join("");
+    var zakRows = zakRowsByTask[tpId];
+    var zakTotalKs = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
+    var zakTotalCena = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
+    var zakRowsHtml = zakRows.map(function(r, idx){
+      var subtotal = (Number(r.mnozstvi)||0) * (Number(r.cena)||0);
+      return '<tr>'+
+        '<td><input type="text" value="'+escapeHtml(r.typ)+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="typ" style="width:130px;"></td>'+
+        '<td><select data-tp="'+tpId+'" data-idx="'+idx+'" data-field="stav">'+
+          '<option value="dobre"'+(r.stav==="dobre"?" selected":"")+'>Dobré</option>'+
+          '<option value="poskozene"'+(r.stav==="poskozene"?" selected":"")+'>Poškozené</option>'+
+        '</select></td>'+
+        '<td><input type="number" min="0" step="1" value="'+r.mnozstvi+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="mnozstvi" style="width:64px;"></td>'+
+        '<td><input type="number" min="0" step="1" value="'+r.cena+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="cena" style="width:76px;"></td>'+
+        '<td id="zak-sub-'+tpId+'-'+idx+'" style="font-family:var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap;">'+fmtKc(subtotal)+'</td>'+
+        '<td><button type="button" class="row-del-btn" data-del-zak="'+tpId+'" data-idx="'+idx+'">Smazat</button></td>'+
+      '</tr>';
+    }).join("");
+    var savedNote = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
+      ? ("Uloženo · naposledy upravil " + zapisovatelName(t.zakaznicka_verze.upravil))
+      : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.";
+
+    wrap.innerHTML =
+      '<div class="prehled-detail-hdr"><div class="task-main"><span class="zak" style="font-size:20px;">'+escapeHtml(v.firma)+'</span>'+
+      '<span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
+      renderFotkyLinks(fotkyAll)+'</div></div>'+
+      '<h3 style="font-family:var(--font-display);font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin:0 0 8px;">Realita třídění</h3>'+
+      '<div class="table-scroll"><table class="rows"><thead><tr><th>Typ (realita)</th><th>Dobré</th><th>Poškozené</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+      (v.poznamka ? '<div class="hint" style="margin-top:6px;"><b>Poznámka (interní):</b> '+escapeHtml(v.poznamka)+'</div>' : '')+
+      '<div style="margin-top:20px;padding-top:16px;border-top:1px dashed var(--border);">'+
+        '<h3 style="font-family:var(--font-display);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.02em;margin:0 0 3px;">Verze pro zákazníka</h3>'+
+        '<p class="hint" style="margin:0 0 8px;">'+escapeHtml(savedNote)+'</p>'+
+        '<div class="table-scroll"><table class="rows">'+
+          '<thead><tr><th>Typ palety</th><th>Stav</th><th>Ks</th><th>Cena/ks</th><th>Celkem</th><th></th></tr></thead>'+
+          '<tbody>'+zakRowsHtml+'</tbody>'+
+          '<tfoot><tr><td colspan="2">Celkem</td><td id="zak-totks-'+tpId+'">'+zakTotalKs+' ks</td><td></td><td id="zak-totcena-'+tpId+'">'+fmtKc(zakTotalCena)+'</td><td></td></tr></tfoot>'+
+        '</table></div>'+
+        '<button type="button" class="btn ghost small" data-add-zak="'+tpId+'" style="margin-top:8px;">+ Přidat řádek</button>'+
+        '<div class="actions-row" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;">'+
+          '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'">Uložit a vygenerovat PDF pro zákazníka</button>'+
+          '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
+        '</div>'+
+      '</div>';
+
+    function recalcZakTotals(){
       var rows = zakRowsByTask[tpId] || [];
       var totKs = 0, totCena = 0;
       rows.forEach(function(r, idx){
@@ -1077,15 +1151,14 @@
     }
 
     function onZakFieldChange(el){
-      var tid = el.getAttribute("data-tp");
       var idx = Number(el.getAttribute("data-idx"));
       var field = el.getAttribute("data-field");
-      var row = zakRowsByTask[tid] && zakRowsByTask[tid][idx];
+      var row = zakRowsByTask[tpId] && zakRowsByTask[tpId][idx];
       if (!row) return;
       if (field === "typ") row.typ = el.value;
       else if (field === "stav") row.stav = el.value;
       else row[field] = Number(el.value) || 0;
-      recalcZakTotals(tid);
+      recalcZakTotals();
     }
     wrap.querySelectorAll('input[data-tp][data-field]').forEach(function(inp){
       inp.addEventListener("input", function(){ onZakFieldChange(inp); });
@@ -1095,16 +1168,14 @@
     });
     wrap.querySelectorAll("[data-del-zak]").forEach(function(btn){
       btn.addEventListener("click", function(){
-        var tid = btn.getAttribute("data-del-zak");
         var idx = Number(btn.getAttribute("data-idx"));
-        zakRowsByTask[tid].splice(idx, 1);
+        zakRowsByTask[tpId].splice(idx, 1);
         renderPrehled();
       });
     });
     wrap.querySelectorAll("[data-add-zak]").forEach(function(btn){
       btn.addEventListener("click", function(){
-        var tid = btn.getAttribute("data-add-zak");
-        zakRowsByTask[tid].push({ id:uid(), typ:"", stav:"dobre", mnozstvi:0, cena:0 });
+        zakRowsByTask[tpId].push({ id:uid(), typ:"", stav:"dobre", mnozstvi:0, cena:0 });
         renderPrehled();
       });
     });
@@ -1193,6 +1264,7 @@
   document.getElementById("tab-btn-ukoly").addEventListener("click", function(){ switchTab("ukoly"); });
   document.getElementById("tab-btn-zpracovat").addEventListener("click", function(){ switchTab("zpracovat"); });
   document.getElementById("tab-btn-prehled").addEventListener("click", function(){ switchTab("prehled"); });
+  document.getElementById("btn-prehled-back").addEventListener("click", function(){ selectedPrehledId = null; renderPrehled(); });
 
   document.getElementById("nu-datum").value = fmtDateCZ(nuForm.datum);
   renderPracovnikChips("nu-pracovnik-chips", nuForm, false);
