@@ -612,7 +612,12 @@
         pracovnik: pracIds, fotky: nakladkaFotky(n),
         stav: (tp && tp.stav === "hotovo") ? "hotovo" : "novy",
         zalozil: "dashboard",
-        vysledek: tp ? tp.vysledek : null
+        vysledek: tp ? tp.vysledek : null,
+        // Pozor: bez tohodle pole appka nikdy nevidí uloženou "verzi pro zákazníka" u vykládek
+        // z Dashboardu (naprostá většina reálných protokolů) — renderPrehled/renderPrehledDetail
+        // čtou t.zakaznicka_verze, který by tu byl navždy undefined, takže by appka i po úspěšném
+        // uložení pořád ukazovala jen výchozí (realitní) řádky, jako by se uložení vůbec nepovedlo.
+        zakaznicka_verze: tp ? tp.zakaznicka_verze : null
       };
     });
 
