@@ -188,24 +188,11 @@
   [hidden]{ display:none !important; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
-  /* PDF pro zákazníka — dočasný skrytý kontejner, ze kterého html2canvas vykresluje
-     stahovaný soubor (viz stahnoutZakaznickyPdf/buildZakaznickyPdfContentHtml). Umístěný
-     mimo viditelnou plochu posunem, ne přes opacity/visibility — ty by se totiž promítly
-     i do vykresleného PDF (html2canvas zachytí skutečně vypočtený vzhled). */
-  .pdf-export-root{ position:fixed; left:-9999px; top:0; width:720px; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }
-  .pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }
-  .pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }
-  .pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }
-  .pdf-export-root h1{ font-size:22px; margin:0 0 4px; }
-  .pdf-export-root .pdf-meta{ font-family:Arial,sans-serif; font-size:14px; margin-bottom:20px; color:#333; }
-  .pdf-export-root .pdf-meta b{ color:#000; }
-  .pdf-export-root table{ width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:13.5px; margin-top:8px; }
-  .pdf-export-root th, .pdf-export-root td{ border:1px solid #ddd; padding:9px 11px; text-align:left; }
-  .pdf-export-root th{ background:#f2f2f2; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#555; }
-  .pdf-export-root td:not(:first-child), .pdf-export-root th:not(:first-child){ text-align:right; }
-  .pdf-export-root tbody tr:nth-child(even){ background:#fafafa; }
-  .pdf-export-root tfoot td{ font-weight:800; border-top:2px solid #111; background:#fff; font-size:14px; }
-  .pdf-export-root .pdf-foot{ margin-top:36px; font-family:Arial,sans-serif; font-size:11px; color:#888; display:flex; justify-content:space-between; }
+  /* Pozn.: CSS pro export protokolu do PDF (.pdf-export-root a spol.) tady záměrně NENÍ —
+     žije jen jako JS řetězec PDF_EXPORT_CSS a vkládá se do izolovaného iframu, ve kterém
+     html2canvas obsah vykresluje (viz stahnoutZakaznickyPdf). Kdyby žilo tady v hlavním
+     stylesheetu appky, k ničemu by to nebylo (iframe má vlastní <style>, tenhle stylesheet
+     nedědí) a jen by to matlo. */
 </style>
 </head>
 <body>
@@ -1282,50 +1269,107 @@
       '<div class="pdf-foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>';
   }
 
-  // Vyrenderuje protokol do dočasného skrytého kontejneru přímo v hlavní stránce appky
-  // (ne do samostatného iframu/dokumentu — html2canvas potřebuje počítat rozměry a styly
-  // vůči hlavnímu oknu appky; když jsme dřív renderovali obsah v odděleném iframu s vlastním
-  // dokumentem, html2canvas z něj neuměl spolehlivě vykreslit obsah a stažené PDF vyšlo
-  // prázdné). Přes html2pdf.js (html2canvas + jsPDF pod kapotou, načtené z CDN) obsah
-  // převede na skutečný PDF soubor a rovnou ho stáhne — bez tiskového dialogu, přímo do
-  // Stažených souborů prohlížeče. Vykreslení přes html2canvas (místo ručního skládání PDF
-  // přes jsPDF text API) je schválně — jsPDF standardní fonty neumí českou diakritiku
-  // (č/ř/š/ž/ě/ů), kdežto html2canvas vykreslí obsah stejně, jak by ho ukázal prohlížeč
-  // (systémovým fontem s plnou diakritikou).
+  // CSS pro export do PDF — vkládá se přímo do izolovaného iframu (viz stahnoutZakaznickyPdf),
+  // ne do hlavního stylesheetu appky.
+  var PDF_EXPORT_CSS =
+    'body{margin:0;}' +
+    '.pdf-export-root{ width:720px; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }' +
+    '.pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }' +
+    '.pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }' +
+    '.pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }' +
+    '.pdf-export-root h1{ font-size:22px; margin:0 0 4px; }' +
+    '.pdf-export-root .pdf-meta{ font-family:Arial,sans-serif; font-size:14px; margin-bottom:20px; color:#333; }' +
+    '.pdf-export-root .pdf-meta b{ color:#000; }' +
+    '.pdf-export-root table{ width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:13.5px; margin-top:8px; }' +
+    '.pdf-export-root th, .pdf-export-root td{ border:1px solid #ddd; padding:9px 11px; text-align:left; }' +
+    '.pdf-export-root th{ background:#f2f2f2; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#555; }' +
+    '.pdf-export-root td:not(:first-child), .pdf-export-root th:not(:first-child){ text-align:right; }' +
+    '.pdf-export-root tbody tr:nth-child(even){ background:#fafafa; }' +
+    '.pdf-export-root tfoot td{ font-weight:800; border-top:2px solid #111; background:#fff; font-size:14px; }' +
+    '.pdf-export-root .pdf-foot{ margin-top:36px; font-family:Arial,sans-serif; font-size:11px; color:#888; display:flex; justify-content:space-between; }';
+
+  // Vyrenderuje protokol do SAMOSTATNÉHO, izolovaného iframu — a je klíčové, že si do
+  // něj knihovna html2pdf.js (html2canvas) načte VLASTNÍ kopii sama přes vlastní <script>
+  // tag uvnitř iframu, ne že bychom použili kopii načtenou v hlavní appce.
+  // Vyzkoušeno a ověřeno přímo v ostrém provozu (na skutečné appce, ne na zjednodušené
+  // testovací stránce), obojí opakovaně:
+  //  - Vykreslení přímo do hlavní stránky appky (ať už position:fixed mimo obrazovku,
+  //    nebo position:static v běžném toku) i vykreslení do iframu, ale se sdílenou
+  //    knihovnou z hlavní appky, končilo buď prázdným PDF, nebo se generování na
+  //    několik desítek sekund zaseklo. Html2canvas z téhle verze balíčku (0.10.1)
+  //    se totiž při zachytávání očividně nedrží jen cíleného elementu ani ownerDocument
+  //    iframu, ale kleedne/prochází celý DOM hlavní appky (dashboard, tabulky, formuláře…)
+  //    — a ten je na to příliš velký/složitý, takže to buď vrátí prázdné plátno, nebo
+  //    se to na tom zasekne.
+  //  - Jakmile se ale html2pdf.js načte ČERSTVĚ přímo uvnitř iframu (vlastní <script src>
+  //    v srcdoc) a volá se přes iframe.contentWindow.html2pdf(...), pracuje jen s malým,
+  //    izolovaným dokumentem iframu — rychlé (cca 1s) a PDF vyjde se skutečným obsahem.
+  // Přes html2pdf.js (html2canvas + jsPDF pod kapotou) se obsah převede na skutečný PDF
+  // soubor a rovnou stáhne — bez tiskového dialogu, přímo do Stažených souborů prohlížeče.
+  // Vykreslení přes html2canvas (místo ručního skládání PDF přes jsPDF text API) je
+  // schválně — jsPDF standardní fonty neumí českou diakritiku (č/ř/š/ž/ě/ů), kdežto
+  // html2canvas vykreslí obsah stejně, jak by ho ukázal prohlížeč (systémovým fontem
+  // s plnou diakritikou).
   function stahnoutZakaznickyPdf(firma, datumIso, radky, tpId){
     function msgEl(){ return document.getElementById("pdf-msg-" + tpId); }
-    if (typeof html2pdf !== "function"){
-      var m0 = msgEl();
-      if (m0){ m0.textContent = "Uloženo ✓, ale knihovna pro PDF se nenačetla — zkontroluj připojení a zkus to znovu."; m0.className = "form-msg err"; }
-      return;
-    }
-    var wrap = document.createElement("div");
-    wrap.className = "pdf-export-root";
-    wrap.innerHTML = buildZakaznickyPdfContentHtml(firma, datumIso, radky);
-    document.body.appendChild(wrap);
-    function cleanup(){ if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
     var filename = "Tridici-protokol_" + sanitizeFileNamePart(firma) + "_" + datumIso + ".pdf";
-    // Dva requestAnimationFrame místo jednoho — první jen naplánuje layout, skutečně
-    // vykreslený (napaintovaný) je kontejner až ve druhém; bez téhle rezervy html2canvas
-    // občas zachytí kontejner dřív, než ho prohlížeč stihne vykreslit, a PDF vyjde prázdné.
-    requestAnimationFrame(function(){
-      requestAnimationFrame(function(){
-        html2pdf().set({
-          margin: 24,
-          filename: filename,
-          html2canvas: { scale: 2, backgroundColor: "#ffffff" },
-          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
-        }).from(wrap).save().then(function(){
-          cleanup();
-          var m = msgEl();
-          if (m){ m.textContent = "Uloženo ✓ · PDF staženo do Stažených souborů"; m.className = "form-msg ok"; }
-        }).catch(function(e){
-          console.error(e);
-          cleanup();
-          var m = msgEl();
-          if (m){ m.textContent = "Uloženo ✓, ale PDF se nepodařilo vygenerovat: " + (e && e.message ? e.message : "neznámá chyba") + "."; m.className = "form-msg err"; }
-        });
-      });
+    var contentHtml = buildZakaznickyPdfContentHtml(firma, datumIso, radky);
+
+    var iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-99999px";
+    iframe.style.top = "0";
+    iframe.style.width = "800px";
+    iframe.style.height = "600px";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    function cleanup(){ if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }
+    function fail(msg){
+      cleanup();
+      var m = msgEl();
+      if (m){ m.textContent = "Uloženo ✓, ale PDF se nepodařilo vygenerovat: " + msg + "."; m.className = "form-msg err"; }
+    }
+
+    var loadPromise = new Promise(function(resolve, reject){
+      iframe.onload = resolve;
+      iframe.onerror = function(){ reject(new Error("stránka pro export se nenačetla")); };
+    });
+
+    iframe.srcdoc = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>" + PDF_EXPORT_CSS + "</style></head><body>" +
+      "<div class=\"pdf-export-root\" id=\"pdf-export-target\">" + contentHtml + "</div>" +
+      "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js\"><\/script>" +
+      "</body></html>";
+
+    loadPromise.then(function(){
+      var tries = 0;
+      function waitForLib(){
+        tries++;
+        var w = iframe.contentWindow;
+        if (w && typeof w.html2pdf === "function"){
+          var targetEl = iframe.contentDocument.getElementById("pdf-export-target");
+          w.html2pdf().set({
+            margin: 24,
+            filename: filename,
+            html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+            jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
+          }).from(targetEl).save().then(function(){
+            cleanup();
+            var m = msgEl();
+            if (m){ m.textContent = "Uloženo ✓ · PDF staženo do Stažených souborů"; m.className = "form-msg ok"; }
+          }).catch(function(e){
+            console.error(e);
+            fail(e && e.message ? e.message : "neznámá chyba");
+          });
+        } else if (tries > 50){
+          fail("knihovna pro PDF se nenačetla — zkontroluj připojení a zkus to znovu");
+        } else {
+          setTimeout(waitForLib, 100);
+        }
+      }
+      waitForLib();
+    }).catch(function(e){
+      fail(e && e.message ? e.message : "neznámá chyba");
     });
   }
 
