@@ -44,10 +44,6 @@
   .tab-btn[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm); }
   .tab-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 
-  .version-note{ display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m); padding:12px 14px; font-size:13px; color:var(--ink-soft); box-shadow:var(--shadow-sm); }
-  .version-note .dot{ width:8px;height:8px;border-radius:50%;background:var(--ink-faint); margin-top:6px; flex:none; }
-  .version-note b{ color:var(--ink); }
-
   .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); padding:18px; box-shadow:var(--shadow-sm); }
   .card h2{ font-family:var(--font-display); font-weight:800; font-size:16px; margin:0 0 3px; letter-spacing:.03em; text-transform:uppercase; }
   .card .hint{ color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
@@ -164,9 +160,6 @@
   .export-box{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px; }
   .export-box textarea{ width:100%; min-height:130px; font-family:var(--font-display); font-size:12.5px; border:1px solid var(--border); border-radius:var(--radius-s); padding:10px; background:var(--surface); color:var(--ink); }
 
-  footer.doc-footer{ font-size:12px; color:var(--ink-faint); border-top:1px solid var(--border); padding-top:16px; line-height:1.6; }
-  footer.doc-footer b{ color:var(--ink-soft); }
-
   /* login */
   .login-ov{ position:fixed; inset:0; background:#0a0a0a; z-index:400; display:none; align-items:center; justify-content:center; padding:20px; }
   .login-ov.open{ display:flex; }
@@ -229,11 +222,6 @@
   <div class="identity-bar">
     <span class="lbl">Kdo právě zapisuje:</span>
     <div class="who-chip" id="who-chip" title="Odhlásit se"><span id="who-name">—</span><span class="ico">⏻</span></div>
-  </div>
-
-  <div class="version-note">
-    <span class="dot"></span>
-    <div><b>Appku zapisují jen Ondřej, Lukáš nebo Martin B.</b> — ne pracovníci na dílně (ti jsou v appce jen jako jméno + odpracovaný čas). Kdo zapisuje se pozná automaticky podle přihlášení (klikni na jméno vpravo nahoře pro odhlášení). <b>Appka teď opravdu čte data appky Dashboard živě</b> (stejný Firebase projekt) — jakmile se tam vykládka označí „Očekává se třídění" (nebo má reálný rozpad na středisko Třídírna), úkol se tady sám objeví (založil „Dashboard"), a jakmile se tady uloží výsledek třídění, vykládka v Dashboardu zmizí z fronty čekajících. Sekce „Nová vykládka" níž zůstává jako ruční záloha pro založení úkolu mimo Dashboard. <b>Sken fotky třídáku (OCR) zatím není zapojený</b> — výsledek se zadává ručně, doplní se později.</div>
   </div>
 
   <section id="panel-ukoly" role="tabpanel">
@@ -340,9 +328,6 @@
     </div>
   </section>
 
-  <footer class="doc-footer">
-    <div><b>Co appka zatím neřeší:</b> sken papírového třídáku (OCR) — zadává se ručně, doplní se přes Anthropic API později; ceny ve „Verzi pro zákazníka" appka nikdy nedosazuje sama — vyplňují se ručně podle domluvy se zákazníkem, nejsou to výkupní ceny appky Výkup; typy palet jsou převzaté přímo z papírového třídáku (EUR A/B, 120×80 AGRIS/TUNA/LAŤ., 100×120, 100×120 rám., 80×60) — vztah k master seznamu appek se ještě doladí; „kdo bude třídit" se u vykládek z Dashboardu přebírá z Plánu práce, pokud tam pro tenhle dovoz existuje.</div>
-  </footer>
 
 </div>
 
