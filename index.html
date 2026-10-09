@@ -95,6 +95,11 @@
   .empty-state p{ margin:0; font-size:13px; max-width:380px; margin-inline:auto; }
 
   /* prehled — kompaktní seznam + detail po rozkliku */
+  .prehled-searchbar{ position:sticky; top:0; z-index:5; background:var(--surface); padding:0 0 12px; margin:0 0 4px; }
+  .prehled-searchbar input{ width:100%; box-sizing:border-box; padding:13px 14px; font-family:var(--font-body); font-size:16px; border:2px solid var(--ink); border-radius:var(--radius-m); background:var(--surface); color:var(--ink); }
+  .prehled-searchbar input:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .prehled-count{ font-size:13px; color:var(--ink-soft); margin-top:6px; }
+  .prehled-count:empty{ display:none; }
   .prehled-row{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-m); padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; justify-content:space-between; cursor:pointer; transition:background .12s, border-color .12s; }
   .prehled-row:hover, .prehled-row:focus-visible{ background:var(--surface-3); border-color:var(--border-strong); }
   .prehled-row + .prehled-row{ margin-top:10px; }
@@ -317,10 +322,9 @@
   <section id="panel-prehled" role="tabpanel" hidden>
     <div class="section-stack">
       <div class="card" id="prehled-list-card">
+        <div class="prehled-searchbar" id="prehled-search-wrap"><input type="search" id="prehled-search" placeholder="🔍 Hledat podle firmy…" autocomplete="off" aria-label="Hledat podle firmy"><div class="prehled-count" id="prehled-count"></div></div>
         <h2>Hotové protokoly</h2>
         <p class="hint">Klikni na protokol pro detail — skutečné kusy podle třídění i verzi pro zákazníka s PDF.</p>
-        <div class="field" id="prehled-search-wrap"><input type="text" id="prehled-search" placeholder="Hledat podle firmy…" autocomplete="off" aria-label="Hledat podle firmy"></div>
-        <div class="hint" id="prehled-count" style="margin:-6px 0 10px;"></div>
         <div id="prehled-list"></div>
       </div>
       <div class="card" id="prehled-detail-card" hidden>
