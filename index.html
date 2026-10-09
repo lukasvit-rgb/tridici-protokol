@@ -220,7 +220,7 @@
   </div>
 
   <div class="identity-bar">
-    <span class="lbl">Kdo právě zapisuje:</span>
+    <span class="lbl" id="who-lbl">Kdo právě zapisuje:</span>
     <div class="who-chip" id="who-chip" title="Odhlásit se"><span id="who-name">—</span><span class="ico">⏻</span></div>
   </div>
 
@@ -376,7 +376,10 @@
   var EMAIL_TO_ZAPISOVATEL = {
     "ondrej.vit@paletyvit.cz": "ondrej",
     "lukas.vit@v-pallets.cz": "lukas",
-    "bortlikmartin2@seznam.cz": "martin_b"
+    "bortlikmartin2@seznam.cz": "martin_b",
+    // Účetní — role "jen čtení" (viz READONLY_ZAPISOVATELE): vidí jen záložku Přehled a
+    // stahuje PDF, nic nezakládá ani nemění. Zadáno 9. 10. 2026.
+    "fakturace@paletyvit.cz": "ucetni"
   };
 
   var WORKERS = [
@@ -396,11 +399,18 @@
     { id:"ondrej",   name:"Ondřej",  color:"#3D5A99" },
     { id:"lukas",    name:"Lukáš",   color:"#8C4F9E" },
     { id:"martin_b", name:"Martin B.", color:"#4A7C59" },
+    { id:"ucetni",   name:"Účetní",  color:"#B07A2A" },
     // Ne skutečný člověk — jen štítek "založil" pro úkoly, které appka Dashboard založila
     // automaticky (vykládka s určením "Třídění"). Proto se nezobrazuje v přepínači níž.
     { id:"dashboard", name:"Dashboard", color:"#8A8A8A" }
   ];
   var currentZapisovatel = null; // nastaví se podle přihlášeného e-mailu, viz onAuthStateChanged
+  // Role "jen čtení": vidí záložku Přehled (hotové protokoly + verze pro zákazníka) a stahuje
+  // PDF z UŽ ULOŽENÉ verze. Nemůže zakládat úkoly, zapisovat třídění ani měnit ceny.
+  // Pozn.: je to omezení rozhraní appky — Firestore Rules zůstávají otevřené (viz
+  // claude/jednotne_prihlaseni_google_navrh.md), takže nejde o pravou bezpečnostní hranici.
+  var READONLY_ZAPISOVATELE = ["ucetni"];
+  function isReadOnly(){ return READONLY_ZAPISOVATELE.indexOf(currentZapisovatel) !== -1; }
 
   function byId(list,id){ for (var i=0;i<list.length;i++){ if (list[i].id===id) return list[i]; } return null; }
   function zapisovatelName(id){ var z = ZAPISOVATELE_LOOKUP(id); return z ? z.name : "—"; }
@@ -648,6 +658,18 @@
   function renderWhoChip(){
     var nameEl = document.getElementById("who-name");
     if (nameEl) nameEl.textContent = zapisovatelName(currentZapisovatel);
+    var lblEl = document.getElementById("who-lbl");
+    if (lblEl) lblEl.textContent = isReadOnly() ? "Přihlášená (jen čtení):" : "Kdo právě zapisuje:";
+  }
+
+  // Role jen pro čtení: schová záložky Úkoly a Zpracovat a rovnou ukáže Přehled.
+  function applyRoleUi(){
+    var ro = isReadOnly();
+    ["ukoly","zpracovat"].forEach(function(n){
+      var b = document.getElementById("tab-btn-"+n);
+      if (b) b.hidden = ro;
+    });
+    switchTab(ro ? "prehled" : "ukoly");
   }
 
   // ---------------- ukoly tab ----------------
@@ -675,6 +697,7 @@
   }
 
   function saveNewTask(){
+    if (isReadOnly()) return;
     var zakaznik = document.getElementById("nu-zakaznik").value.trim();
     var pocet = Number(document.getElementById("nu-pocet").value || 0);
     var msg = document.getElementById("nu-msg");
@@ -981,6 +1004,7 @@
   });
 
   function saveResult(){
+    if (isReadOnly()) return;
     var msg = document.getElementById("result-msg");
     var firma = document.getElementById("r-firma").value.trim();
     if (!firma){ msg.textContent = "Vyplň firmu/zákazníka."; msg.className="form-msg err"; return; }
@@ -1110,8 +1134,14 @@
     var zakRows = zakRowsByTask[tpId];
     var zakTotalKs = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
     var zakTotalCena = zakRows.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
+    var ro = isReadOnly();
+    var hasSaved = !!(t.zakaznicka_verze && t.zakaznicka_verze.radky && t.zakaznicka_verze.radky.length);
     var zakRowsHtml = zakRows.map(function(r, idx){
       var subtotal = (Number(r.mnozstvi)||0) * (Number(r.cena)||0);
+      if (ro){
+        return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(STAV_LABELS[r.stav]||"—")+'</td><td>'+(Number(r.mnozstvi)||0)+'</td><td style="white-space:nowrap;">'+fmtKc(Number(r.cena)||0)+'</td>'+
+          '<td style="font-family:var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap;">'+fmtKc(subtotal)+'</td></tr>';
+      }
       return '<tr>'+
         '<td><input type="text" value="'+escapeHtml(r.typ)+'" data-tp="'+tpId+'" data-idx="'+idx+'" data-field="typ" style="width:130px;"></td>'+
         '<td><select data-tp="'+tpId+'" data-idx="'+idx+'" data-field="stav">'+
@@ -1126,7 +1156,8 @@
     }).join("");
     var savedNote = (t.zakaznicka_verze && t.zakaznicka_verze.ulozeno)
       ? ("Uloženo · naposledy upravil " + zapisovatelName(t.zakaznicka_verze.upravil))
-      : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.";
+      : (ro ? "Verze pro zákazníka zatím není uložená — ceny doplní Lukáš nebo Ondřej, pak půjde stáhnout PDF."
+            : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.");
 
     wrap.innerHTML =
       '<div class="prehled-detail-hdr"><div class="task-main"><span class="zak" style="font-size:20px;">'+escapeHtml(v.firma)+'</span>'+
@@ -1139,14 +1170,14 @@
         '<h3 style="font-family:var(--font-display);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.02em;margin:0 0 3px;">Verze pro zákazníka</h3>'+
         '<p class="hint" style="margin:0 0 8px;">'+escapeHtml(savedNote)+'</p>'+
         '<div class="table-scroll"><table class="rows">'+
-          '<thead><tr><th>Typ palety</th><th>Stav</th><th>Ks</th><th>Cena/ks</th><th>Celkem</th><th></th></tr></thead>'+
+          '<thead><tr><th>Typ palety</th><th>Stav</th><th>Ks</th><th>Cena/ks</th><th>Celkem</th>'+(ro?'':'<th></th>')+'</tr></thead>'+
           '<tbody>'+zakRowsHtml+'</tbody>'+
-          '<tfoot><tr><td colspan="2">Celkem</td><td id="zak-totks-'+tpId+'">'+zakTotalKs+' ks</td><td></td><td id="zak-totcena-'+tpId+'">'+fmtKc(zakTotalCena)+'</td><td></td></tr></tfoot>'+
+          '<tfoot><tr><td colspan="2">Celkem</td><td id="zak-totks-'+tpId+'">'+zakTotalKs+' ks</td><td></td><td id="zak-totcena-'+tpId+'">'+fmtKc(zakTotalCena)+'</td>'+(ro?'':'<td></td>')+'</tr></tfoot>'+
         '</table></div>'+
-        '<button type="button" class="btn ghost small" data-add-zak="'+tpId+'" style="margin-top:8px;">+ Přidat řádek</button>'+
+        (ro ? '' : '<button type="button" class="btn ghost small" data-add-zak="'+tpId+'" style="margin-top:8px;">+ Přidat řádek</button>')+
         '<div class="actions-row" style="display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px;">'+
-          '<button type="button" class="btn ghost" data-save-tp="'+tpId+'">Uložit</button>'+
-          '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'">Generovat PDF pro zákazníka</button>'+
+          (ro ? '' : '<button type="button" class="btn ghost" data-save-tp="'+tpId+'">Uložit</button>')+
+          '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'"'+((ro && !hasSaved)?' disabled':'')+'>'+(ro ? 'Stáhnout PDF pro zákazníka' : 'Generovat PDF pro zákazníka')+'</button>'+
           '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
         '</div>'+
       '</div>';
@@ -1215,6 +1246,7 @@
   // odpojený z DOMu — nastavení textu na něj by uživatel nikdy neviděl, ani při úspěchu,
   // ani při chybě. Element zprávy i tlačítko proto hledáme až uvnitř then/catch, ne předem.
   function saveZakaznickaVerze(tpId, pendingText, successText){
+    if (isReadOnly()) return Promise.reject(new Error("read-only"));
     function msgEl(){ return document.getElementById("pdf-msg-" + tpId); }
     var task = tasks.filter(function(t){ return t._tpId === tpId; })[0];
     if (!task){
@@ -1244,8 +1276,20 @@
   // tlačítko "Uložit"), a jen při úspěchu rovnou stáhne PDF. Když se uložení nepovede,
   // PDF se nestahuje (nemělo by smysl stahovat něco, co appka nemá jistě uložené).
   function saveAndGeneratePdf(tpId){
+    if (isReadOnly()){
+      // Role jen pro čtení: nic neukládá, PDF vzniká z už uložené verze pro zákazníka.
+      var tk = tasks.filter(function(t){ return t._tpId === tpId; })[0];
+      var saved = tk && tk.zakaznicka_verze && tk.zakaznicka_verze.radky;
+      if (!tk || !saved || !saved.length){
+        var m = document.getElementById("pdf-msg-" + tpId);
+        if (m){ m.textContent = "Verze pro zákazníka zatím není uložená."; m.className = "form-msg err"; }
+        return;
+      }
+      stahnoutZakaznickyPdf(tk.vysledek.firma, tk.vysledek.datum, saved, tpId, zapisovatelName(tk.vysledek.zapsal));
+      return;
+    }
     saveZakaznickaVerze(tpId, "Ukládám…", "Uloženo ✓ · generuji PDF…").then(function(res){
-      stahnoutZakaznickyPdf(res.task.vysledek.firma, res.task.vysledek.datum, res.radky, tpId);
+      stahnoutZakaznickyPdf(res.task.vysledek.firma, res.task.vysledek.datum, res.radky, tpId, zapisovatelName(res.task.vysledek.zapsal));
     }).catch(function(){ /* chyba už je vypsaná v #pdf-msg-<tpId> */ });
   }
 
@@ -1255,7 +1299,14 @@
   // Ceny jsou ty, za které zákazníkovi fakturujeme — ne výkupní ceník appky Výkup. Každá
   // položka (typ + stav dobré/poškozené) má vlastní řádek s cenou za kus a mezisoučtem;
   // dole je součet všech kusů a celkové ceny.
-  function buildZakaznickyPdfContentHtml(firma, datumIso, radky){
+  //
+  // Vizuální styl (hlavička + orámovaný info-box se Zákazník/Datum, tenké linky v tabulce)
+  // je odlehčená verze firemního vzhledu podle IS Allegro (na žádost 23. 9. 2026 — zvolena
+  // tahle jednodušší varianta místo plné dvousloupcové repliky). Data v protokolu zůstávají
+  // stejná jako dřív — žádné nové ruční zadávání (IČO/DIČ zákazníka, DPH, platební podmínky
+  // v appce nejsou a nebyly přidány). "Vystavil" v patičce je z existujícího pole v.zapsal
+  // (appka ho zaznamenává automaticky), ne nové ruční pole.
+  function buildZakaznickyPdfContentHtml(firma, datumIso, radky, zapsalJmeno){
     var rowsHtml = radky.map(function(r){
       var mnozstvi = Number(r.mnozstvi)||0, cena = Number(r.cena)||0, sub = mnozstvi*cena;
       return '<tr><td>'+escapeHtml(r.typ)+'</td><td>'+(STAV_LABELS[r.stav]||"—")+'</td><td>'+mnozstvi+' ks</td><td>'+fmtKc(cena)+'</td><td>'+fmtKc(sub)+'</td></tr>';
@@ -1263,15 +1314,21 @@
     var totalKs = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0); }, 0);
     var totalCena = radky.reduce(function(s,r){ return s + (Number(r.mnozstvi)||0) * (Number(r.cena)||0); }, 0);
     var vystaveno = new Date().toLocaleString("cs-CZ");
-    return '<div class="pdf-hdr"><div class="pdf-co">PALETY VÍT s.r.o.<small>Třídění a zpracování palet</small>'+
-      '<div class="pdf-co-details">Lomnička 187, 666 01 Tišnov<br>IČO: 17811422 &nbsp;·&nbsp; DIČ: CZ17811422<br>+420 730 154 501 &nbsp;·&nbsp; info@paletyvit.cz</div>'+
-      '</div><h1>Třídicí protokol</h1></div>'+
-      '<div class="pdf-meta"><b>Zákazník:</b> '+escapeHtml(firma)+' &nbsp;&nbsp; <b>Datum:</b> '+fmtDateCZ(datumIso)+'</div>'+
+    return '<div class="pdf-hdr">'+
+        '<div class="pdf-co">PALETY VÍT s.r.o.<small>Třídění a zpracování palet</small>'+
+        '<div class="pdf-co-details">Lomnička 187, 666 01 Lomnička<br>IČO: 17811422 · DIČ: CZ17811422<br>+420 730 154 501 · info@paletyvit.cz</div>'+
+        '</div>'+
+        '<div class="pdf-title"><h1>Třídicí protokol</h1></div>'+
+      '</div>'+
+      '<div class="pdf-infobox">'+
+        '<div class="item"><span class="lbl">Zákazník</span><span class="val">'+escapeHtml(firma)+'</span></div>'+
+        '<div class="item"><span class="lbl">Datum</span><span class="val">'+fmtDateCZ(datumIso)+'</span></div>'+
+      '</div>'+
       '<table><thead><tr><th>Typ palety</th><th>Stav</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>'+
       '<tbody>'+rowsHtml+'</tbody>'+
       '<tfoot><tr><td colspan="2">Celkem</td><td>'+totalKs+' ks</td><td></td><td>'+fmtKc(totalCena)+'</td></tr></tfoot>'+
       '</table>'+
-      '<div class="pdf-foot"><span>Palety Vít</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>';
+      '<div class="pdf-foot"><span>Vystavil: '+escapeHtml(zapsalJmeno || "—")+'</span><span>Vystaveno: '+escapeHtml(vystaveno)+'</span></div>';
   }
 
   // CSS pro export do PDF — vkládá se přímo do izolovaného iframu (viz stahnoutZakaznickyPdf),
@@ -1285,21 +1342,22 @@
   // useknuté). 660px s paddingem uvnitř (border-box) dává bezpečnou rezervu.
   var PDF_EXPORT_CSS =
     'body{margin:0;}' +
-    '.pdf-export-root{ width:660px; box-sizing:border-box; padding:24px; background:#ffffff; font-family:Georgia,"Times New Roman",serif; color:#111; }' +
-    '.pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #111; padding-bottom:12px; margin-bottom:24px; gap:16px; flex-wrap:wrap; }' +
-    '.pdf-export-root .pdf-co{ font-family:Arial,sans-serif; font-weight:800; font-size:20px; letter-spacing:.03em; }' +
-    '.pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:11px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:2px; }' +
-    '.pdf-export-root .pdf-co-details{ font-family:Arial,sans-serif; font-weight:400; font-size:10.5px; letter-spacing:normal; text-transform:none; color:#666; margin-top:6px; line-height:1.5; }' +
-    '.pdf-export-root h1{ font-size:22px; margin:0 0 4px; }' +
-    '.pdf-export-root .pdf-meta{ font-family:Arial,sans-serif; font-size:14px; margin-bottom:20px; color:#333; }' +
-    '.pdf-export-root .pdf-meta b{ color:#000; }' +
-    '.pdf-export-root table{ width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:13.5px; margin-top:8px; }' +
-    '.pdf-export-root th, .pdf-export-root td{ border:1px solid #ddd; padding:9px 11px; text-align:left; }' +
-    '.pdf-export-root th{ background:#f2f2f2; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#555; }' +
+    '.pdf-export-root{ width:660px; box-sizing:border-box; padding:24px; background:#ffffff; font-family:Arial,Helvetica,sans-serif; color:#111; }' +
+    '.pdf-export-root .pdf-hdr{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #111; padding-bottom:14px; margin-bottom:18px; gap:16px; flex-wrap:wrap; }' +
+    '.pdf-export-root .pdf-co{ font-weight:800; font-size:21px; letter-spacing:.03em; line-height:1.15; }' +
+    '.pdf-export-root .pdf-co small{ display:block; font-weight:500; font-size:10.5px; letter-spacing:.08em; color:#666; text-transform:uppercase; margin-top:3px; }' +
+    '.pdf-export-root .pdf-co-details{ font-weight:400; font-size:10px; letter-spacing:normal; text-transform:none; color:#666; margin-top:8px; line-height:1.55; }' +
+    '.pdf-export-root .pdf-title{ text-align:right; flex:none; }' +
+    '.pdf-export-root .pdf-title h1{ font-size:23px; margin:0; font-weight:800; letter-spacing:.02em; text-transform:uppercase; white-space:nowrap; }' +
+    '.pdf-export-root .pdf-infobox{ border:1px solid #bbb; padding:10px 14px; margin-bottom:22px; display:flex; gap:32px; flex-wrap:wrap; }' +
+    '.pdf-export-root .pdf-infobox .lbl{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#777; margin-bottom:3px; }' +
+    '.pdf-export-root .pdf-infobox .val{ display:block; font-size:14px; font-weight:700; color:#111; }' +
+    '.pdf-export-root table{ width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }' +
+    '.pdf-export-root th{ border-bottom:2px solid #111; padding:8px 10px 9px; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#444; font-weight:700; }' +
+    '.pdf-export-root td{ border-bottom:1px solid #e2e2e2; padding:9px 10px; text-align:left; }' +
     '.pdf-export-root td:not(:first-child), .pdf-export-root th:not(:first-child){ text-align:right; }' +
-    '.pdf-export-root tbody tr:nth-child(even){ background:#fafafa; }' +
-    '.pdf-export-root tfoot td{ font-weight:800; border-top:2px solid #111; background:#fff; font-size:14px; }' +
-    '.pdf-export-root .pdf-foot{ margin-top:36px; font-family:Arial,sans-serif; font-size:11px; color:#888; display:flex; justify-content:space-between; }';
+    '.pdf-export-root tfoot td{ font-weight:800; border-top:2px solid #111; border-bottom:none; background:#fff; font-size:14.5px; padding-top:12px; }' +
+    '.pdf-export-root .pdf-foot{ margin-top:40px; font-size:11px; color:#555; display:flex; justify-content:space-between; border-top:1px solid #ddd; padding-top:10px; }';
 
   // Vyrenderuje protokol do SAMOSTATNÉHO, izolovaného iframu — a je klíčové, že si do
   // něj knihovna html2pdf.js (html2canvas) načte VLASTNÍ kopii sama přes vlastní <script>
@@ -1323,10 +1381,10 @@
   // schválně — jsPDF standardní fonty neumí českou diakritiku (č/ř/š/ž/ě/ů), kdežto
   // html2canvas vykreslí obsah stejně, jak by ho ukázal prohlížeč (systémovým fontem
   // s plnou diakritikou).
-  function stahnoutZakaznickyPdf(firma, datumIso, radky, tpId){
+  function stahnoutZakaznickyPdf(firma, datumIso, radky, tpId, zapsalJmeno){
     function msgEl(){ return document.getElementById("pdf-msg-" + tpId); }
     var filename = "Tridici-protokol_" + sanitizeFileNamePart(firma) + "_" + datumIso + ".pdf";
-    var contentHtml = buildZakaznickyPdfContentHtml(firma, datumIso, radky);
+    var contentHtml = buildZakaznickyPdfContentHtml(firma, datumIso, radky, zapsalJmeno);
 
     var iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
@@ -1407,6 +1465,7 @@
 
   // ---------------- tabs ----------------
   function switchTab(name){
+    if (isReadOnly()) name = "prehled";
     ["ukoly","zpracovat","prehled"].forEach(function(n){
       document.getElementById("panel-"+n).hidden = (n !== name);
       document.getElementById("tab-btn-"+n).setAttribute("aria-selected", n===name ? "true":"false");
@@ -1507,6 +1566,7 @@
       loginScreen.classList.remove("open");
       appRoot.style.display = "";
       renderWhoChip();
+      applyRoleUi();
       if (!firestoreStarted){ firestoreStarted = true; initFirestore(); }
     } else if (user){
       // Přihlášený e-mail appka nezná (není ve zmíněné trojici) — nepovolený účet.
