@@ -319,6 +319,8 @@
       <div class="card" id="prehled-list-card">
         <h2>Hotové protokoly</h2>
         <p class="hint">Klikni na protokol pro detail — skutečné kusy podle třídění i verzi pro zákazníka s PDF.</p>
+        <div class="field" id="prehled-search-wrap"><input type="text" id="prehled-search" placeholder="Hledat podle firmy…" autocomplete="off" aria-label="Hledat podle firmy"></div>
+        <div class="hint" id="prehled-count" style="margin:-6px 0 10px;"></div>
         <div id="prehled-list"></div>
       </div>
       <div class="card" id="prehled-detail-card" hidden>
@@ -669,7 +671,7 @@
       var b = document.getElementById("tab-btn-"+n);
       if (b) b.hidden = ro;
     });
-    switchTab(ro ? "prehled" : "ukoly");
+    switchTab(ro ? "prehled" : "ukoly", "replace");
   }
 
   // ---------------- ukoly tab ----------------
@@ -1061,6 +1063,11 @@
   // Kompaktní seznam hotových protokolů (nejnovější první) + detail po rozkliku jednoho
   // řádku — kvůli přehlednosti pro účetní, která odtud přebírá reálný stav třídění.
   var selectedPrehledId = null;
+  var prehledQuery = "";
+  // porovnání bez diakritiky a velikosti písmen ("tisnov" najde "Tišnov")
+  function normSearch(x){
+    return String(x == null ? "" : x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  }
 
   function renderPrehled(){
     var listCard = document.getElementById("prehled-list-card");
@@ -1078,12 +1085,21 @@
 
     if (done.length === 0){
       listWrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s PDF protokolem pro zákazníka.</p></div>';
+      document.getElementById("prehled-search-wrap").hidden = true;
+      document.getElementById("prehled-count").textContent = "";
       listCard.hidden = false;
       detailCard.hidden = true;
       return;
     }
+    document.getElementById("prehled-search-wrap").hidden = false;
 
-    listWrap.innerHTML = done.map(function(t){
+    var q = normSearch(prehledQuery);
+    var shown = q ? done.filter(function(t){ return normSearch(t.vysledek.firma).indexOf(q) !== -1; }) : done;
+    document.getElementById("prehled-count").textContent = q ? ("Nalezeno " + shown.length + " z " + done.length) : "";
+
+    listWrap.innerHTML = shown.length === 0
+      ? '<div class="empty-state"><h3>Nic nenalezeno</h3><p>Žádný hotový protokol neodpovídá hledané firmě.</p></div>'
+      : shown.map(function(t){
       var v = t.vysledek;
       var totDobre = (v.radky||[]).reduce(function(s,r){ return s + (Number(r.dobre)||0); }, 0);
       var totPosk = (v.radky||[]).reduce(function(s,r){ return s + (Number(r.poskozene)||0); }, 0);
@@ -1101,6 +1117,7 @@
     listWrap.querySelectorAll("[data-open-prehled]").forEach(function(row){
       row.addEventListener("click", function(){
         selectedPrehledId = row.getAttribute("data-open-prehled");
+        navPush();
         renderPrehled();
       });
       row.addEventListener("keydown", function(e){
@@ -1464,19 +1481,52 @@
   }
 
   // ---------------- tabs ----------------
-  function switchTab(name){
+  // Historie prohlížeče: každá záložka i otevřený detail v Přehledu je krok v historii,
+  // takže tlačítko Zpět (telefon, prohlížeč) vrací o krok zpět v appce místo opuštění stránky.
+  var currentTab = "ukoly";
+  function navHash(){
+    return "#" + currentTab + (currentTab === "prehled" && selectedPrehledId ? "/" + selectedPrehledId : "");
+  }
+  function navState(){ return { tp:1, tab: currentTab, det: (currentTab === "prehled" ? selectedPrehledId : null) }; }
+  function navPush(){
+    try { if (location.hash !== navHash()) history.pushState(navState(), "", navHash()); } catch(e){}
+  }
+  function navReplace(){
+    try { history.replaceState(navState(), "", navHash()); } catch(e){}
+  }
+  // mode: undefined = nový krok v historii, "replace" = přepsat aktuální krok, "pop" = návrat z historie (nic nezapisovat)
+  function switchTab(name, mode){
     if (isReadOnly()) name = "prehled";
+    currentTab = name;
     ["ukoly","zpracovat","prehled"].forEach(function(n){
       document.getElementById("panel-"+n).hidden = (n !== name);
       document.getElementById("tab-btn-"+n).setAttribute("aria-selected", n===name ? "true":"false");
     });
+    if (mode === "replace") navReplace();
+    else if (mode !== "pop") navPush();
     if (name === "prehled") renderPrehled();
     if (name === "zpracovat") renderTaskPicker();
   }
+  window.addEventListener("popstate", function(e){
+    var st = e.state;
+    if (!st || !st.tp){
+      var m = /^#(ukoly|zpracovat|prehled)(?:\/(.+))?$/.exec(location.hash || "");
+      st = m ? { tab: m[1], det: m[2] || null } : { tab: isReadOnly() ? "prehled" : "ukoly", det: null };
+    }
+    selectedPrehledId = st.det || null;
+    switchTab(st.tab, "pop");
+  });
   document.getElementById("tab-btn-ukoly").addEventListener("click", function(){ switchTab("ukoly"); });
   document.getElementById("tab-btn-zpracovat").addEventListener("click", function(){ switchTab("zpracovat"); });
-  document.getElementById("tab-btn-prehled").addEventListener("click", function(){ switchTab("prehled"); });
-  document.getElementById("btn-prehled-back").addEventListener("click", function(){ selectedPrehledId = null; renderPrehled(); });
+  document.getElementById("tab-btn-prehled").addEventListener("click", function(){ selectedPrehledId = null; switchTab("prehled"); });
+  document.getElementById("btn-prehled-back").addEventListener("click", function(){
+    if (history.state && history.state.tp && history.state.det){ history.back(); return; }
+    selectedPrehledId = null; navPush(); renderPrehled();
+  });
+  document.getElementById("prehled-search").addEventListener("input", function(e){
+    prehledQuery = e.target.value;
+    renderPrehled();
+  });
 
   document.getElementById("nu-datum").value = fmtDateCZ(nuForm.datum);
   renderPracovnikChips("nu-pracovnik-chips", nuForm, false);
