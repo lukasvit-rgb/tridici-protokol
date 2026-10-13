@@ -323,6 +323,7 @@
     <div class="section-stack">
       <div class="card" id="prehled-list-card">
         <div class="prehled-searchbar" id="prehled-search-wrap"><input type="search" id="prehled-search" placeholder="🔍 Hledat podle firmy…" autocomplete="off" aria-label="Hledat podle firmy"><div class="prehled-count" id="prehled-count"></div></div>
+        <div class="form-msg ok" id="prehled-flash" style="margin:0 0 10px;"></div>
         <h2>Hotové protokoly</h2>
         <p class="hint">Klikni na protokol pro detail — skutečné kusy podle třídění i verzi pro zákazníka s PDF.</p>
         <div id="prehled-list"></div>
@@ -417,6 +418,9 @@
   // claude/jednotne_prihlaseni_google_navrh.md), takže nejde o pravou bezpečnostní hranici.
   var READONLY_ZAPISOVATELE = ["ucetni"];
   function isReadOnly(){ return READONLY_ZAPISOVATELE.indexOf(currentZapisovatel) !== -1; }
+  // Mazat hotové třídáky smí jen Lukáš a Ondřej (opět jen omezení rozhraní, ne Firestore Rules).
+  var DELETE_ZAPISOVATELE = ["lukas", "ondrej"];
+  function canDeleteTp(){ return DELETE_ZAPISOVATELE.indexOf(currentZapisovatel) !== -1; }
 
   function byId(list,id){ for (var i=0;i<list.length;i++){ if (list[i].id===id) return list[i]; } return null; }
   function zapisovatelName(id){ var z = ZAPISOVATELE_LOOKUP(id); return z ? z.name : "—"; }
@@ -1067,6 +1071,7 @@
   // Kompaktní seznam hotových protokolů (nejnovější první) + detail po rozkliku jednoho
   // řádku — kvůli přehlednosti pro účetní, která odtud přebírá reálný stav třídění.
   var selectedPrehledId = null;
+  var deleteConfirmId = null; // tpId, u kterého je právě rozbalené potvrzení mazání
   var prehledQuery = "";
   // porovnání bez diakritiky a velikosti písmen ("tisnov" najde "Tišnov")
   function normSearch(x){
@@ -1086,6 +1091,7 @@
     if (selectedPrehledId && !done.some(function(t){ return t._tpId === selectedPrehledId; })){
       selectedPrehledId = null;
     }
+    if (deleteConfirmId && deleteConfirmId !== selectedPrehledId) deleteConfirmId = null;
 
     if (done.length === 0){
       listWrap.innerHTML = '<div class="empty-state"><div class="glyph">TP</div><h3>Zatím žádné hotové protokoly</h3><p>Jakmile uložíš první výsledek třídění v záložce Zpracovat, objeví se tady i s PDF protokolem pro zákazníka.</p></div>';
@@ -1180,6 +1186,20 @@
       : (ro ? "Verze pro zákazníka zatím není uložená — ceny doplní Lukáš nebo Ondřej, pak půjde stáhnout PDF."
             : "Zatím neuloženo — výchozí řádky jsou podle reality výš (bez ceny), doplň cenu za kus podle domluvy se zákazníkem.");
 
+    var delHtml = "";
+    if (canDeleteTp()){
+      delHtml = '<div style="margin-top:22px;padding-top:16px;border-top:1px dashed var(--border);">'+
+        (deleteConfirmId === tpId
+          ? '<div class="hint" style="margin:0 0 10px;color:var(--damaged);font-weight:600;">Opravdu smazat tenhle třídák'+(t._source === "nakladka" ? ' (vykládka se vrátí do Úkolů)' : '')+'? Smaže se výsledek třídění i verze pro zákazníka. Nejde vrátit zpět.</div>'+
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;">'+
+              '<button type="button" class="btn small" data-del-confirm="'+tpId+'" style="background:var(--damaged);color:#fff;border:1px solid var(--damaged);">Ano, smazat</button>'+
+              '<button type="button" class="btn ghost small" data-del-cancel="'+tpId+'">Zrušit</button>'+
+            '</div>'
+          : '<button type="button" class="btn ghost small" data-del-tp="'+tpId+'" style="color:var(--damaged);border-color:var(--damaged);">Smazat třídák</button>')+
+        '<div class="form-msg" id="del-msg-'+tpId+'"></div>'+
+      '</div>';
+    }
+
     wrap.innerHTML =
       '<div class="prehled-detail-hdr"><div class="task-main"><span class="zak" style="font-size:20px;">'+escapeHtml(v.firma)+'</span>'+
       '<span class="meta">'+fmtDateCZ(v.datum)+' · '+escapeHtml(names)+' · zapsal '+zapisovatelName(v.zapsal)+'</span>'+
@@ -1201,7 +1221,8 @@
           '<button type="button" class="btn primary" data-pdf-tp="'+tpId+'"'+((ro && !hasSaved)?' disabled':'')+'>'+(ro ? 'Stáhnout PDF pro zákazníka' : 'Generovat PDF pro zákazníka')+'</button>'+
           '<div class="form-msg" id="pdf-msg-'+tpId+'"></div>'+
         '</div>'+
-      '</div>';
+      '</div>'+
+      delHtml;
 
     function recalcZakTotals(){
       var rows = zakRowsByTask[tpId] || [];
@@ -1253,6 +1274,53 @@
     });
     wrap.querySelectorAll("[data-pdf-tp]").forEach(function(btn){
       btn.addEventListener("click", function(){ saveAndGeneratePdf(btn.getAttribute("data-pdf-tp")); });
+    });
+    wrap.querySelectorAll("[data-del-tp]").forEach(function(btn){
+      btn.addEventListener("click", function(){ deleteConfirmId = tpId; renderPrehled(); });
+    });
+    wrap.querySelectorAll("[data-del-cancel]").forEach(function(btn){
+      btn.addEventListener("click", function(){ deleteConfirmId = null; renderPrehled(); });
+    });
+    wrap.querySelectorAll("[data-del-confirm]").forEach(function(btn){
+      btn.addEventListener("click", function(){ deleteTridak(t, btn); });
+    });
+  }
+
+  // Smazání hotového třídáku (jen Lukáš/Ondřej). U vykládky z Dashboardu se NEJDŘÍV vrátí
+  // nakladky.stav na "nove" (vykládka se vrátí do Úkolů) a teprve potom se smaže záznam —
+  // kdyby selhal první krok, nic se nesmaže a vykládka nezmizí z obou appek. Fotka třídáku
+  // na Disku se záměrně NEmaže (zůstává ve složce zakázky).
+  function deleteTridak(t, btn){
+    if (!canDeleteTp()) return;
+    var tpId = t._tpId;
+    var msg = document.getElementById("del-msg-" + tpId);
+    if (btn) btn.disabled = true;
+    if (msg){ msg.textContent = "Mažu…"; msg.className = "form-msg"; }
+    var step1 = Promise.resolve();
+    if (t._source === "nakladka" && t._nakladkaId){
+      step1 = db.collection("nakladky").doc(t._nakladkaId).update({ stav: "nove" }).catch(function(e){
+        if (e && e.code === "not-found") return; // vykládka už v Dashboardu neexistuje — stačí smazat třídák
+        throw e;
+      });
+    }
+    step1.then(function(){
+      return db.collection("tridici_protokoly").doc(tpId).delete();
+    }).then(function(){
+      delete zakRowsByTask[tpId];
+      deleteConfirmId = null;
+      var flash = document.getElementById("prehled-flash");
+      if (flash){
+        flash.textContent = "Třídák smazán" + (t._source === "nakladka" ? " — vykládka je zpět v Úkolech." : ".");
+        setTimeout(function(){ if (flash.textContent) flash.textContent = ""; }, 8000);
+      }
+      selectedPrehledId = null;
+      if (history.state && history.state.tp && history.state.det){ history.back(); }
+      else { navPush(); renderPrehled(); }
+    }).catch(function(e){
+      console.error(e);
+      var m = document.getElementById("del-msg-" + tpId);
+      if (m){ m.textContent = "Smazání se nepovedlo. Zkus to znovu."; m.className = "form-msg err"; }
+      var b = document.querySelector('[data-del-confirm="' + tpId + '"]'); if (b) b.disabled = false;
     });
   }
 
